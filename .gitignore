@@ -1,3 +1,4 @@
 lyft-motion-prediction-autonomous-vehicles/
 .DS_Store
 l5kit
+data_analyze/logs_output/
