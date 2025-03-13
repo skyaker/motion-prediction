@@ -19,3 +19,4 @@ kagglehub
 protobuf==3.20.* 
 ace-tools
 pyarrow
+yaml

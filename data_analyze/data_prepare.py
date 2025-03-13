@@ -5,6 +5,12 @@ from l5kit.data import ChunkedDataset, LocalDataManager
 from l5kit.dataset import AgentDataset
 from l5kit.configs import load_config_data
 from l5kit.rasterization import build_rasterizer
+import yaml
+
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+mode = config["hardware"]["mode"]
 
 # --- Настройки L5Kit ---
 DATA_PATH = "../lyft-motion-prediction-autonomous-vehicles"

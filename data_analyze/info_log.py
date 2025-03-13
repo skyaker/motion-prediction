@@ -2,6 +2,12 @@ import os
 import numpy as np
 import pandas as pd
 from l5kit.data import ChunkedDataset, LocalDataManager
+import yaml
+
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+mode = config["hardware"]["mode"]
 
 # --- НАСТРОЙКИ ---
 DATA_PATH = "../lyft-motion-prediction-autonomous-vehicles"
@@ -16,8 +22,8 @@ dataset = ChunkedDataset(dm.require(zarr_path)).open()
 print(f"Всего кадров: {len(dataset.frames)}")
 
 # --- НАСТРОЙКИ ЛОГИРОВАНИЯ ---
-SAMPLE_RATE = 0.01  # 1% данных
-BATCH_SIZE = 10_000  # 10 000 кадров в один файл
+SAMPLE_RATE = config["processing"]["sample_rate"][mode]
+BATCH_SIZE = config["processing"]["batch_size"][mode]
 total_frames = len(dataset.frames)
 
 # --- СОЗДАЕМ ПАПКУ ДЛЯ ЛОГОВ ---

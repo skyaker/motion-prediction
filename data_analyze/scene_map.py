@@ -4,6 +4,12 @@ import matplotlib.pyplot as plt
 from l5kit.data import ChunkedDataset, LocalDataManager
 from l5kit.rasterization import build_rasterizer
 from l5kit.geometry import transform_points
+import yaml
+
+with open("config.yaml", "r") as f:
+    config = yaml.safe_load(f)
+
+mode = config["hardware"]["mode"]
 
 # Dataset load
 data_path = "/home/drama/temp_usr/motion-prediction/lyft-motion-prediction-autonomous-vehicles"
@@ -16,9 +22,9 @@ zarr_dataset = ChunkedDataset(dm.require("scenes/train.zarr")).open()
 # Raster config
 cfg = {
     "raster_params": {
-        "raster_size": [4200, 4200],  
-        "pixel_size": [0.05, 0.05],  
-        "ego_center": [0.5, 0.5],  
+        "raster_size": config["raster_params"]["raster_size"][mode],  
+        "pixel_size": config["raster_params"]["pixel_size"][mode],  
+        "ego_center": config["raster_params"]["ego_center"],  
         "map_type": "py_semantic",  
         "dataset_meta_key": "meta.json",
         "semantic_map_key": "semantic_map/semantic_map.pb",
@@ -27,14 +33,14 @@ cfg = {
         "disable_traffic_light_faces": False,  
     },
     "model_params": {
-        "history_num_frames": 10,
-        "future_num_frames": 50,
+        "history_num_frames": config["model_params"]["history_num_frames"],
+        "future_num_frames": config["model_params"]["future_num_frames"],
         "model_architecture": "resnet18",
         "load_model": False,
         "model_path": "model.pth",
         "lr": 1e-3,
         "weight_decay": 1e-5,
-        "train_epochs": 10,
+        "train_epochs": config["model_params"]["train_epochs"][mode],
         "render_ego_history": True
     }
 }
