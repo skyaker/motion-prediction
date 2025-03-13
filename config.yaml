@@ -1,0 +1,30 @@
+# 🔹 Общие настройки
+data_path: "../lyft-motion-prediction-autonomous-vehicles"
+log_path: "logs_output"
+save_path: "data_analyze"
+model_path: "model.pth"
+
+# 🔹 Настройки железа (выбрать "weak" или "strong")
+hardware: "weak"  # Использовать "weak" для ThinkPad, "strong" для 3080
+
+# 🔹 Конфигурация для слабого железа (ThinkPad X230)
+weak:
+  batch_size: 5000
+  num_workers: 2
+  raster_size: [224, 224]  # Уменьшаем разрешение карты
+  pixel_size: [0.5, 0.5]
+  ego_center: [0.25, 0.5]
+  history_num_frames: 5
+  future_num_frames: 20
+  step_time: 0.1
+
+# 🔹 Конфигурация для мощного железа (RTX 3080, 16 ядер)
+strong:
+  batch_size: 50000
+  num_workers: 12
+  raster_size: [4200, 4200]  # Полное разрешение карты
+  pixel_size: [0.05, 0.05]
+  ego_center: [0.5, 0.5]
+  history_num_frames: 10
+  future_num_frames: 50
+  step_time: 0.1
