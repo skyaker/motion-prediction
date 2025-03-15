@@ -12,7 +12,7 @@ with open("config.yaml", "r") as f:
 mode = config["hardware"]["mode"]
 
 # Dataset load
-data_path = "/home/drama/temp_usr/motion-prediction/lyft-motion-prediction-autonomous-vehicles"
+data_path = "/Users/jungdongwook/vscode/Thesis_code/lyft-motion-prediction-autonomous-vehicles"
 os.environ["L5KIT_DATA_FOLDER"] = data_path
 dm = LocalDataManager(None)
 

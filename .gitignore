@@ -3,3 +3,4 @@ lyft-motion-prediction-autonomous-vehicles/
 l5kit
 data_analyze/logs_output/
 archive-logs
+data_analyze/lyft-config.yaml
