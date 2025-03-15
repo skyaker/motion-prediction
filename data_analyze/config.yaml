@@ -3,7 +3,7 @@ hardware:
   mode: "weak"
 
 paths:
-  data_path: "../lyft-motion-prediction-autonomous-vehicles"
+  data_path: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles"
   output_data: "./"
   log_output: "logs_output"
   images_output: "images"
@@ -26,8 +26,8 @@ raster_params:
   ego_center: [0.5, 0.5]
   map_type: "py_semantic"
   satellite_map_key: "aerial_map/aerial_map.png"
-  semantic_map_key: "../lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"
-  dataset_meta_key: "../lyft-motion-prediction-autonomous-vehicles/meta.json"
+  semantic_map_key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"
+  dataset_meta_key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/meta.json"
   set_origin_to_bottom: False
   filter_agents_threshold: 0.9
   disable_traffic_light_faces: False
@@ -53,17 +53,17 @@ visualization:
 
 data_loaders:
   train:
-    key: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
+    key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
     batch_size: 16
     shuffle: True
     num_workers: 4
   validation:
-    key: "../lyft-motion-prediction-autonomous-vehicles/scenes/validate.zarr"
+    key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/validate.zarr"
     batch_size: 16
     shuffle: False
     num_workers: 4
   test:
-    key: "../lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
+    key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
     batch_size: 16
     shuffle: False
     num_workers: 4
