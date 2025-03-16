@@ -2,13 +2,13 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import yaml
 
-with open("config.yaml", "r") as f:
+with open("../config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 mode = config["hardware"]["mode"]
 
 # Загружаем данные
-df = pd.read_parquet("logs_output/il_logs.parquet")
+df = pd.read_parquet("../data_analyze/logs_output/il_logs.parquet")
 
 # --- Построение гистограммы ---
 plt.figure(figsize=(10, 6))

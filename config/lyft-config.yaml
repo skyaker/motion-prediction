@@ -1,19 +1,19 @@
-data_path: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles"
+data_path: "../lyft-motion-prediction-autonomous-vehicles"
 
 train_data_loader:
-  key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
+  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
   batch_size: 16
   shuffle: True
   num_workers: 4
 
 val_data_loader:
-  key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/validate.zarr"
+  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/validate.zarr"
   batch_size: 16
   shuffle: False
   num_workers: 4
 
 test_data_loader:
-  key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
+  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
   batch_size: 16
   shuffle: False
   num_workers: 4
@@ -24,8 +24,8 @@ raster_params:
   ego_center: [0.25, 0.5]  # Смещение центра автомобиля на изображении
   map_type: "py_semantic"  # Тип карты (семантическая)
   satellite_map_key: "aerial_map/aerial_map.png"  # Путь к спутниковой карте
-  semantic_map_key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"  # Путь к семантической карте
-  dataset_meta_key: "/kaggle/input/lyft-motion-prediction-autonomous-vehicles/meta.json"  # Метаданные датасета
+  semantic_map_key: "../lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"  # Путь к семантической карте
+  dataset_meta_key: "../lyft-motion-prediction-autonomous-vehicles/meta.json"  # Метаданные датасета
   set_origin_to_bottom: False  # Переворачивать ли карту (False = стандарт)
   filter_agents_threshold: 0.5  # Фильтрация агентов (0.5 = стандарт)
   disable_traffic_light_faces: False  # Использовать ли светофоры в сцене

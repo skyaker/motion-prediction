@@ -4,7 +4,7 @@ import pandas as pd
 from l5kit.data import ChunkedDataset, LocalDataManager
 import yaml
 
-with open("config.yaml", "r") as f:
+with open("../config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 mode = config["hardware"]["mode"]

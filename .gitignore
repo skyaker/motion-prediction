@@ -4,3 +4,5 @@ l5kit
 data_analyze/logs_output/
 archive-logs
 data_analyze/lyft-config.yaml
+data_analyze/images/*
+visualization/images
