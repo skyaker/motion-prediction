@@ -9,7 +9,7 @@ from l5kit.configs import load_config_data
 from l5kit.rasterization import build_rasterizer
 
 # --- Загружаем конфиг ---
-with open("config.yaml", "r") as f:
+with open("../config/config.yaml", "r") as f:
     config = yaml.safe_load(f)
 
 mode = config["hardware"]["mode"]  # Выбираем "weak" или "strong"
@@ -17,7 +17,7 @@ mode = config["hardware"]["mode"]  # Выбираем "weak" или "strong"
 # --- Настройки L5Kit ---
 DATA_PATH = config["paths"]["data_path"]
 os.environ["L5KIT_DATA_FOLDER"] = DATA_PATH
-cfg = load_config_data("config.yaml")  # Конфиг L5Kit
+cfg = load_config_data("../config/config.yaml")  # Конфиг L5Kit
 dm = LocalDataManager(None)
 
 # --- Параметры режима (weak/strong) ---
@@ -32,7 +32,7 @@ cfg["processing"]["batch_size"] = BATCH_SIZE
 cfg["processing"]["sample_rate"] = SAMPLE_RATE
 
 # --- Загружаем датасет ---
-zarr_path = dm.require(config["data_loaders"]["train"]["key"])
+zarr_path = dm.require(config["data_loaders"]["sample"]["key"])
 dataset = ChunkedDataset(zarr_path).open()
 
 # --- Создаем растеризатор (карту) ---
@@ -72,9 +72,9 @@ for idx, sample in enumerate(agent_dataset):
     Y_list.append(sample["target_positions"])  # Будущие координаты (выход)
     Mask_list.append(sample["target_availabilities"])  # Маска доступности
 
-    print("asdfasdfklj")
+    print(idx)
 
-    if idx % 5000 == 0:
+    if idx % 1000 == 0:
         elapsed_time = time.time() - start_time
         log_message(f"🟢 Обработано {idx} примеров... Время: {elapsed_time:.2f} сек")
 
