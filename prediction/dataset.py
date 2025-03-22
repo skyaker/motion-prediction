@@ -1,23 +1,27 @@
-import torch
-from torch.utils.data import DataLoader, TensorDataset
+from l5kit.dataset import AgentDataset
+from torch.utils.data import Dataset
+import numpy as np
 
-def load_dataset(file_path, batch_size=2):
-    data = torch.load(file_path)
+class TrajectoryDataset(Dataset):
+    def __init__(self, cfg, zarr_dataset, rasterizer):
+        self.agent_dataset = AgentDataset(cfg, zarr_dataset, rasterizer)
 
-    X = torch.tensor(data["images"], dtype=torch.float32)
-    Y = torch.tensor(data["target_positions"], dtype=torch.float32)
-    mask = torch.tensor(data["target_availabilities"], dtype=torch.float32)
+    def __len__(self):
+        return len(self.agent_dataset)
 
-    is_stationary = (Y.abs().sum(dim=-1) == 0).float().unsqueeze(-1)
+    def __getitem__(self, idx):
+        data = self.agent_dataset[idx]
 
-    dataset = TensorDataset(X, Y, mask, is_stationary)
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        history = data["history_positions"]
+        diffs = np.linalg.norm(history[1:] - history[:-1], axis=1)
+        is_stationary = float(np.mean(diffs) < 0.1) 
 
-    print(f"Data loaded: {len(dataset)}")
-    return dataloader
-
-if __name__ == "__main__":
-  dataloader = load_dataset("../dataprocessing/l5kit_dataset_part1.pth")
-  for batch in dataloader:
-    images, targets, masks, stationary = batch
-    break
+        return {
+            "centroid": data["centroid"],
+            "yaw": data["yaw"],
+            "history_positions": data["history_positions"],
+            "image": data["image"],
+            "target_positions": data["target_positions"],
+            "target_availabilities": data["target_availabilities"],
+            "is_stationary": is_stationary
+        }

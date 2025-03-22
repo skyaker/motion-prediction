@@ -1,124 +1,152 @@
-# import torch
-# import matplotlib.pyplot as plt
-# from model import TrajectoryPredictor
-# from dataset import load_dataset
-# import numpy as np
-
-# model = TrajectoryPredictor()
-# model.load_state_dict(torch.load("output_data/model.pth"))
-# model.eval()
-
-# dataloader = load_dataset("../dataprocessing/l5kit_dataset_part1.pth", batch_size=1)
-# sample_image, sample_target, _ = next(iter(dataloader))
-
-# with torch.no_grad():
-#   predicted_trajectory = model(sample_image).squeeze(0).numpy()
-
-
-# plt.imshow(sample_image.squeeze().permute(1, 2, 0))
-# plt.scatter(sample_target[0, :, 0], sample_target[0, :, 1], color="green", label="Real")
-# plt.scatter(predicted_trajectory[:, 0], predicted_trajectory[:, 1], color="red", label="Predicted")
-# plt.legend()
-# plt.title("Real & predicted")
-# plt.show()
-# ------------------------------------------------------
-# fig, axes = plt.subplots(5, 5, figsize=(15, 15))
-# sample_image = sample_image.squeeze()
-
-# for i, ax in enumerate(axes.flat):
-#     if i < 25: 
-#         ax.imshow(sample_image[i], cmap="gray")
-#         ax.set_title(f"Channel {i+1}")
-#         ax.axis("off")
-
-# plt.show()
-# ---------------------------------All channels---------------------------------
-# fig, axes = plt.subplots(5, 5, figsize=(15, 15))
-# sample_image = sample_image.squeeze()
-
-# for i, ax in enumerate(axes.flat):
-#   if i < 25:
-#     ax.imshow(sample_image[i], cmap="gray")
-#     ax.set_title(f"Channel {i+1}")
-#     ax.axis("off")
-
-# plt.show()
-# ---------------------------------Prediction---------------------------------
-
 import torch
-import matplotlib.pyplot as plt
-import numpy as np
+torch.set_num_threads(1)
+torch.set_num_interop_threads(1)
+from torch.utils.data import DataLoader
+from l5kit.configs import load_config_data
+from l5kit.data import LocalDataManager, ChunkedDataset
+from l5kit.rasterization import build_rasterizer
+from dataset import TrajectoryDataset
 from model import TrajectoryPredictor
-from dataset import load_dataset
+from metrics import nll_loss
+from sklearn.decomposition import PCA
+
+import matplotlib.pyplot as plt
+import json
 import os
+import numpy as np
+from tqdm import tqdm
 
-OUTPUT_DIR = "output_images"
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+def unwrap_mode_config(cfg, mode):
+    """Заменяет словари с weak/strong на конкретные значения"""
+    def unwrap_block(d):
+        return {k: v[mode] if isinstance(v, dict) and mode in v else v for k, v in d.items()}
+    
+    cfg["raster_params"] = unwrap_block(cfg["raster_params"])
+    cfg["model_params"] = unwrap_block(cfg["model_params"])
+    cfg["train_data_loader"] = unwrap_block(cfg["train_data_loader"])
+    cfg["test_data_loader"] = unwrap_block(cfg["test_data_loader"])
+    return cfg
 
-model = TrajectoryPredictor()
-model.load_state_dict(torch.load("output_data/model.pth"))
-model.eval()
 
-dataloader = load_dataset("../dataprocessing/l5kit_dataset_part1.pth", batch_size=1)
+def visualize_scene(rasterizer, agent_batch, predictions, confidences, save_path, scene_id):
+    """
+    Отображает сцену с картой и агентами.
+    Использует L5Kit `to_rgb()` для генерации правильного растра.
+    """
+    from matplotlib import pyplot as plt
 
-prev_scene_index = None
-scene_counter = 0
-image_num = 0
+    fig, ax = plt.subplots(figsize=(8, 8))
+    colors = ['r', 'g', 'm']
 
-for sample_image, sample_target, masks, is_stationary in dataloader:
-    if sample_target.numel() == 0:
-        continue
+    for i, agent_data in enumerate(agent_batch):
+        # Получаем изображение сцены вокруг агента (с реальной картой)
+        img = agent_data["image"]  # ← из TrajectoryDataset
+        
+        # img_vis = img.mean(axis=0)  # [112, 112]
+        # ax.imshow(img_vis, cmap='viridis')  # или 'gray'
 
-    scene_index = 0
-    timestamp = 0 
-    print(f"Scene ID: {scene_index}, Timestamp: {timestamp}")
+        flat = img.reshape(25, -1).T  # shape [12544, 25]
 
-    if prev_scene_index is not None and prev_scene_index != scene_index:
-        scene_counter += 1
+        pca = PCA(n_components=3)
+        img_rgb = pca.fit_transform(flat)  # [12544, 3]
 
-    prev_scene_index = scene_index
+        # Вернуть обратно в [112, 112, 3]
+        img_rgb = img_rgb.reshape(112, 112, 3)
+        img_rgb -= img_rgb.min()
+        img_rgb /= img_rgb.max()  # нормализуем до [0, 1]
+
+        ax.imshow(img_rgb)
+
+
+        # Центроид в пикселях — центр изображения
+        center = np.array(img.shape[:2])[::-1] / 2
+
+        # История (жёлтые точки)
+        history = agent_data["history_positions"]
+        ax.plot(history[:, 0] + center[0], history[:, 1] + center[1], 'yo', markersize=2)
+
+        # Реальная будущая траектория (синяя)
+        target = agent_data["target_positions"]
+        ax.plot(target[:, 0] + center[0], target[:, 1] + center[1], 'b-', linewidth=1)
+
+        # Предсказанные траектории (красная, зелёная, фиолетовая)
+        for k in range(predictions[i].shape[0]):
+            traj = predictions[i][k]
+            ax.plot(traj[:, 0] + center[0], traj[:, 1] + center[1],
+                    color=colors[k % len(colors)], linestyle='--', linewidth=1,
+                    alpha=float(confidences[i][k]))
+
+    ax.set_title(f"Scene {scene_id}")
+    ax.axis("off")
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
+
+def main():
+    cfg = load_config_data("../config/lyft-config.yaml")
+    mode = cfg.get("hardware", {}).get("mode", "weak")
+    cfg = unwrap_mode_config(cfg, mode)
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    dm = LocalDataManager("../lyft-motion-prediction-autonomous-vehicles")
+    zarr_dataset = ChunkedDataset(dm.require(cfg["test_data_loader"]["key"]))
+    zarr_dataset.open()
+    rasterizer = build_rasterizer(cfg, dm)
+
+    dataset = TrajectoryDataset(cfg, zarr_dataset, rasterizer)
+    dataloader = DataLoader(dataset, batch_size=cfg["test_data_loader"]["batch_size"],
+                            shuffle=False, num_workers=cfg["test_data_loader"]["num_workers"])
+
+    model = TrajectoryPredictor(future_len=cfg["model_params"]["future_num_frames"], num_modes=3)
+    model.load_state_dict(torch.load(cfg["model_params"]["model_path"], map_location=device))
+    model.to(device)
+    model.eval()
+
+    total_loss = 0.0
+    all_preds = []
+    all_confs = []
+    agent_data = []
+
+    output_dir = cfg["paths"]["output_data"]
+    os.makedirs(output_dir, exist_ok=True)
 
     with torch.no_grad():
-        predicted_trajectory = model(sample_image, is_stationary).squeeze(0).numpy()
+        for i, batch in enumerate(tqdm(dataloader, desc="Testing")):
+            image = batch["image"].to(device)
+            is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)
+            targets = batch["target_positions"].to(device)
+            avail = batch["target_availabilities"].to(device)
 
-    sample_target = sample_target.squeeze(0).numpy()
-    masks = masks.squeeze(0).numpy()
+            preds, confs = model(image, is_stationary)
+            loss = nll_loss(preds, confs, targets, avail)
+            total_loss += loss.item()
 
-    valid_points = sample_target[masks > 0]
+            # Сохраняем первые 3 примера как JSON + PNG
+            if i < 3:
+                agents_info = []
+                for j in range(image.shape[0]):
+                    agents_info.append({
+                        "centroid": batch["centroid"][j].numpy(),
+                        "yaw": batch["yaw"][j].numpy(),
+                        "extent": np.array([4.0, 1.8, 1.7]),
+                        "image": batch["image"][j].cpu().numpy(),
+                        "history_positions": batch["history_positions"][j].numpy(),
+                        "target_positions": batch["target_positions"][j].numpy()
+                    })
 
-    IMAGE_SIZE = 512
-    PIXEL_SCALE = IMAGE_SIZE / 100
-    center_x, center_y = IMAGE_SIZE // 2, IMAGE_SIZE // 2
+                visualize_scene(
+                    rasterizer,
+                    agents_info,
+                    preds.cpu().numpy(),
+                    confs.cpu().numpy(),
+                    save_path=os.path.join(output_dir, f"vis_{i}.png"),
+                    scene_id=i
+                )
 
-    sample_target_px = valid_points * PIXEL_SCALE + np.array([center_x, center_y])
-    predicted_trajectory_px = predicted_trajectory * PIXEL_SCALE + np.array([center_x, center_y])
+    avg_loss = total_loss / len(dataloader)
+    print(f"📉 Average NLL Loss on test set: {avg_loss:.4f}")
 
-    fig, axs = plt.subplots(1, 3, figsize=(18, 6))
-
-    axs[0].imshow(sample_image.squeeze().mean(dim=0).numpy(), cmap="gray")
-    axs[0].scatter(sample_target_px[:, 0], sample_target_px[:, 1], color="green", label="Real")
-    axs[0].set_title(f"Real (Scene {scene_index})")
-    axs[0].legend()
-    axs[0].axis("off")
-
-    axs[1].imshow(sample_image.squeeze().mean(dim=0).numpy(), cmap="gray")
-    axs[1].scatter(predicted_trajectory_px[:, 0], predicted_trajectory_px[:, 1], color="red", label="Predicted")
-    axs[1].set_title("Predicted")
-    axs[1].legend()
-    axs[1].axis("off")
-
-    axs[2].imshow(sample_image.squeeze().mean(dim=0).numpy(), cmap="gray")
-    axs[2].scatter(sample_target_px[:, 0], sample_target_px[:, 1], color="green", label="Real")
-    axs[2].scatter(predicted_trajectory_px[:, 0], predicted_trajectory_px[:, 1], color="red", label="Predicted", marker='x')
-    axs[2].set_title("Real & predicted")
-    axs[2].legend()
-    axs[2].axis("off")
-
-    plt.tight_layout()
-
-    output_path = os.path.join(OUTPUT_DIR, f"scene_{scene_counter}_id_{image_num}.png")
-    image_num += 1
-    plt.savefig(output_path)
-    plt.close(fig)
-
-    print(f"Saved: {output_path}")
+if __name__ == "__main__":
+    main()
