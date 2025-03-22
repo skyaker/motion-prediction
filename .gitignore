@@ -6,3 +6,8 @@ archive-logs
 data_analyze/lyft-config.yaml
 data_analyze/images/*
 visualization/images
+prediction/output_data/
+prediction/output_images/
+__pycache__
+*.pth
+dataprocessing/logs/

@@ -1,10 +1,26 @@
+hardware:
+  mode: "weak"
+  # mode: "strong"
+
 data_path: "../lyft-motion-prediction-autonomous-vehicles"
 
+# train_data_loader:
+#   key: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
+#   batch_size: 16
+#   shuffle: True
+#   num_workers: 4
+
 train_data_loader:
-  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
-  batch_size: 16
+  key:
+    weak: "../lyft-motion-prediction-autonomous-vehicles/scenes/sample.zarr"
+    strong: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
+  batch_size:
+    weak: 4
+    strong: 64
   shuffle: True
-  num_workers: 4
+  num_workers:
+    weak: 2
+    strong: 6
 
 val_data_loader:
   key: "../lyft-motion-prediction-autonomous-vehicles/scenes/validate.zarr"
@@ -12,40 +28,80 @@ val_data_loader:
   shuffle: False
   num_workers: 4
 
-test_data_loader:
-  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
-  batch_size: 16
-  shuffle: False
-  num_workers: 4
+# test_data_loader:
+#   key: "../lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
+#   batch_size: 16
+#   shuffle: False
+#   num_workers: 4
 
-sample_data_loader:
-  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/sample.zarr"
-  batch_size: 16
+test_data_loader:
+  # key: "../lyft-motion-prediction-autonomous-vehicles/scenes/test.zarr"
+  key: "../lyft-motion-prediction-autonomous-vehicles/scenes/sample.zarr" # TEMP VALUE
+  batch_size:
+    weak: 4
+    strong: 32
   shuffle: False
-  num_workers: 4
+  num_workers:
+    weak: 2
+    strong: 4
+
+# sample_data_loader:
+#   key: "../lyft-motion-prediction-autonomous-vehicles/scenes/sample.zarr"
+#   batch_size: 16
+#   shuffle: False
+#   num_workers: 4
+
+# raster_params:
+#   raster_size: [224, 224]  # Размер изображения (в пикселях)
+#   pixel_size: [0.5, 0.5]  # Размер пикселя в метрах
+#   ego_center: [0.25, 0.5]  # Смещение центра автомобиля на изображении
+#   map_type: "py_semantic"  # Тип карты (семантическая)
+#   satellite_map_key: "aerial_map/aerial_map.png"  # Путь к спутниковой карте
+#   semantic_map_key: "../lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"  # Путь к семантической карте
+#   dataset_meta_key: "../lyft-motion-prediction-autonomous-vehicles/meta.json"  # Метаданные датасета
+#   set_origin_to_bottom: False  # Переворачивать ли карту (False = стандарт)
+#   filter_agents_threshold: 0.5  # Фильтрация агентов (0.5 = стандарт)
+#   disable_traffic_light_faces: False  # Использовать ли светофоры в сцене
 
 raster_params:
-  raster_size: [224, 224]  # Размер изображения (в пикселях)
-  pixel_size: [0.5, 0.5]  # Размер пикселя в метрах
-  ego_center: [0.25, 0.5]  # Смещение центра автомобиля на изображении
-  map_type: "py_semantic"  # Тип карты (семантическая)
-  satellite_map_key: "aerial_map/aerial_map.png"  # Путь к спутниковой карте
-  semantic_map_key: "../lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"  # Путь к семантической карте
-  dataset_meta_key: "../lyft-motion-prediction-autonomous-vehicles/meta.json"  # Метаданные датасета
-  set_origin_to_bottom: False  # Переворачивать ли карту (False = стандарт)
-  filter_agents_threshold: 0.5  # Фильтрация агентов (0.5 = стандарт)
-  disable_traffic_light_faces: False  # Использовать ли светофоры в сцене
+  raster_size:
+    weak: [112, 112]
+    strong: [224, 224]
+  pixel_size: [0.5, 0.5]
+  ego_center: [0.25, 0.5]
+  map_type: "py_semantic"
+  satellite_map_key: "aerial_map/aerial_map.png"
+  semantic_map_key: "../lyft-motion-prediction-autonomous-vehicles/semantic_map/semantic_map.pb"
+  dataset_meta_key: "../lyft-motion-prediction-autonomous-vehicles/meta.json"
+  set_origin_to_bottom: False
+  filter_agents_threshold: 0.5
+  disable_traffic_light_faces: False
+
+# model_params:
+#   history_num_frames: 10  # Количество исторических кадров (контекст)
+#   future_num_frames: 50  # Количество прогнозируемых кадров
+#   model_architecture: "resnet18"  # Используемая архитектура (ResNet18)
+#   load_model: False  # Загружать ли предобученную модель
+#   model_path: "model.pth"  # Путь к файлу модели
+#   lr: 0.001  # Скорость обучения (learning rate)
+#   weight_decay: 0.00001  # Коэффициент регуляризации
+#   train_epochs: 10  # Количество эпох обучения
+#   render_ego_history: True  # Использовать ли историю движения эго-автомобиля
+#   step_time: 0.1
 
 model_params:
-  history_num_frames: 10  # Количество исторических кадров (контекст)
-  future_num_frames: 50  # Количество прогнозируемых кадров
-  model_architecture: "resnet18"  # Используемая архитектура (ResNet18)
-  load_model: False  # Загружать ли предобученную модель
-  model_path: "model.pth"  # Путь к файлу модели
-  lr: 1e-3  # Скорость обучения (learning rate)
-  weight_decay: 1e-5  # Коэффициент регуляризации
-  train_epochs: 10  # Количество эпох обучения
-  render_ego_history: True  # Использовать ли историю движения эго-автомобиля
+  history_num_frames: 10
+  future_num_frames: 50
+  train_epochs:
+    weak: 1
+    strong: 10
+  model_architecture: "resnet18"
+  load_model: False
+  model_path: "model.pth"
+  lr: 0.001
+  weight_decay: 0.00001
+  render_ego_history: True
+  step_time: 0.1
 
 training_params:
   batch_size: 64  # Размер батча
@@ -53,3 +109,6 @@ training_params:
   num_workers: 4  # Количество потоков загрузки данных
   optimizer: "adam"  # Оптимизатор (Adam)
   scheduler: "step"  # Планировщик скорости обучения
+
+paths:
+  output_data: "output_data/"
