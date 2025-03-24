@@ -10,4 +10,6 @@ prediction/output_data/
 prediction/output_images/
 __pycache__
 *.pth
-dataprocessing/logs/
+dataprocessing/
+prediction/test_archive.py
+prediction/debug_infer.py

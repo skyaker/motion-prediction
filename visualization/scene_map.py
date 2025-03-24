@@ -123,8 +123,8 @@ print(f"Уникальные метки агентов в сцене: {unique_la
 
 # Определяем категории
 is_vehicle = agent_labels == 3  # Автомобили
-is_pedestrian = agent_labels == 1  # Пешеходы
-is_cyclist = agent_labels == 14  # Велосипедисты
+is_pedestrian = agent_labels == 14  # Пешеходы
+is_cyclist = agent_labels == 12  # Велосипедисты
 
 # Создаем график
 fig, ax = plt.subplots(figsize=(10, 8))
