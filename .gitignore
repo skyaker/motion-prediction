@@ -13,3 +13,4 @@ __pycache__
 dataprocessing/
 prediction/test_archive.py
 prediction/debug_infer.py
+prediction/raster_channels_images

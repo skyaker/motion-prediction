@@ -27,36 +27,40 @@ def world_to_image_coords(points, centroid, yaw, pixel_size, raster_size):
     return pixels + image_center
 
 
-def visualize_scene(image, history, target, predictions, confidences, output_path, raster_size):
+def visualize_scene(image, history, target, predictions, confidences, output_path, raster_size, num_trajectories=3):
     fig, ax = plt.subplots(figsize=(8, 8))
-    
-    # Raster map
-    img_sum = image.sum(axis=0)  # (C, H, W) → (H, W)
-    ax.imshow(img_sum, cmap='gray', origin='upper')
+    MAP_CHANNELS = [22, 23, 24]  # можно менять под любые слои
+    img_rgb = image[MAP_CHANNELS, :, :].transpose(1, 2, 0)
 
-    # Historical points (blue)
-    if history is not None:
-        ax.plot(history[:, 0] * 4 + raster_size[0] * 0.25, 
-                history[:, 1] * 4 + raster_size[1] * 0.5, 
-                'o-', color='blue', label='History')
+    ax.imshow(img_rgb, origin='upper')
 
-    # Real trajectory (green)
-    if target is not None:
-        ax.plot(target[:, 0] * 4 + raster_size[0] * 0.25, 
-                target[:, 1] * 4 + raster_size[1] * 0.5, 
-                'o--', color='green', label='Real')
+    def to_pixel_coords(points):
+        return points[:, 0] * 4 + raster_size[0] * 0.25, points[:, 1] * 4 + raster_size[1] * 0.5
 
-    # Predicted trajectory (red)
+    # Предсказания (красные + оттенки)
     if predictions is not None and len(predictions) > 0:
-        best_pred = predictions[0]
-        ax.plot(best_pred[:, 0] * 4 + raster_size[0] * 0.25, 
-                best_pred[:, 1] * 4 + raster_size[1] * 0.5, 
-                'x-', color='red', label='Prediction')
+        num_trajectories = min(num_trajectories, len(predictions))
+        sorted_idx = np.argsort(-confidences)[:num_trajectories]  # по убыванию
+
+        for j, idx in enumerate(sorted_idx):
+            traj = predictions[idx]
+            conf = confidences[idx]
+            x, y = to_pixel_coords(traj)
+            ax.plot(x, y, 's-', alpha=0.6 + 0.4 * (conf / confidences.max()), label=f'Pred #{j+1} ({conf:.2f})')
+
+    # История (синяя)
+    if history is not None:
+        x, y = to_pixel_coords(history)
+        ax.plot(x, y, 'o-', color='blue', label='History')
+
+    # Истинная траектория (зелёная)
+    if target is not None:
+        x, y = to_pixel_coords(target)
+        ax.plot(x, y, 'o--', color='red', label='Real')
 
     ax.legend()
     ax.set_title("All points visualization")
     ax.axis('off')
-
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     plt.savefig(output_path, bbox_inches='tight')
     plt.close()

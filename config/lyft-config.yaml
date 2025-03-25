@@ -93,7 +93,7 @@ model_params:
   history_num_frames: 10
   future_num_frames: 50
   train_epochs:
-    weak: 1
+    weak: 2
     strong: 10
   model_architecture: "resnet18"
   load_model: False
