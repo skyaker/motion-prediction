@@ -39,11 +39,16 @@ import torch.nn.functional as F
 #     return -log_likelihood.mean()
 
 
-def compute_smoothness_loss(predictions):
-    # predictions: [B, K, T, 2]
+def compute_smoothness_loss(predictions, alpha=1.0, beta=1.0):
+    # speed
+    vel = predictions[:, :, 1:, :] - predictions[:, :, :-1, :]
+    vel_loss = (vel ** 2).sum(-1).sum(-1).mean()
+
+    # acceleration
     acc = predictions[:, :, 2:, :] - 2 * predictions[:, :, 1:-1, :] + predictions[:, :, :-2, :]
-    smooth_loss = (acc ** 2).sum(-1).sum(-1).mean()  # Средний по B, K
-    return smooth_loss
+    jerk_loss = (acc ** 2).sum(-1).sum(-1).mean()
+
+    return alpha * vel_loss + beta * jerk_loss
 
 
 def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambda_smooth=0.5):
@@ -56,7 +61,6 @@ def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambd
     log_likelihood = torch.log(likelihood.sum(dim=1) + 1e-9)
     nll = -log_likelihood.mean()
 
-    # Add smoothness penalty
-    smooth = compute_smoothness_loss(predictions)
-    total_loss = nll + lambda_smooth * smooth
-    return total_loss
+    smooth = compute_smoothness_loss(predictions, alpha=1.0, beta=1.0)
+    # print(f"[DEBUG] NLL: {nll.item():.4f}, Smooth: {smooth.item():.4f}")
+    return nll + lambda_smooth * smooth
