@@ -20,4 +20,6 @@ protobuf==3.20.*
 ace-tools
 pyarrow
 kaggle
+scikit-learn
+timm
 # yaml
