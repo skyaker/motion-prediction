@@ -3,7 +3,7 @@ import torch.nn as nn
 import timm
 
 class TrajectoryPredictor(nn.Module):
-    def __init__(self, input_channels=25, num_modes=3, future_len=50):
+    def __init__(self, input_channels=29, num_modes=3, future_len=50):
         super().__init__()
         self.num_modes = num_modes
         self.future_len = future_len

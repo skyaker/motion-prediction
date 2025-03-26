@@ -74,7 +74,7 @@ def main():
 
             optimizer.zero_grad()
             predictions, confidences = model(image, is_stationary)  # [B, 3, T, 2], [B, 3]
-            loss = nll_loss(predictions, confidences, targets, availabilities)
+            loss = nll_loss(predictions, confidences, targets, availabilities, lambda_smooth=0.5)
 
             loss.backward()
             optimizer.step()
