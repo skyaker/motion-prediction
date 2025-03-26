@@ -181,18 +181,22 @@ def main():
                 confs = confidences[i]
 
                 global_index = batch_idx * image.shape[0] + i
-                save_path = f"output_images/scene_{global_index}.png"
-                visualize_scene(
-                    image=img,
-                    history=history,
-                    target=target,
-                    predictions=preds,
-                    confidences=confs,
-                    output_path=save_path,
-                    raster_size=raster_size
-                )
 
-                collage_path = f"output_images/collage_scene_{global_index}.png"
+                base_dir = "server_output/output_images/"
+                os.makedirs(base_dir, exist_ok=True)
+                collage_path = os.path.join(base_dir, f"collage_scene_{global_index}.png")  # или как у тебя называется
+
+                # visualize_scene(
+                #     image=img,
+                #     history=history,
+                #     target=target,
+                #     predictions=preds,
+                #     confidences=confs,
+                #     output_path=save_path,
+                #     raster_size=raster_size
+                # )
+
+                # collage_path = f"output_images/collage_scene_{global_index}.png"
                 visualize_scene_collage(
                     image=img,
                     history=history,

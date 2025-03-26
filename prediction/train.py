@@ -64,8 +64,14 @@ def main():
     model.train()
     best_loss = float('inf')
 
+    os.makedirs("server_output", exist_ok=True)
+    log_file = open("server_output/train_log.txt", "a")
+
     for epoch in range(num_epochs):
         epoch_loss = 0.0
+        nll_total = 0.0
+        smooth_total = 0.0
+
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             image = batch["image"].to(device)  # [B, 25, 224, 224]
             is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)  # [B, 1]
@@ -74,7 +80,10 @@ def main():
 
             optimizer.zero_grad()
             predictions, confidences = model(image, is_stationary)  # [B, 3, T, 2], [B, 3]
-            loss = nll_loss(predictions, confidences, targets, availabilities, lambda_smooth=0.5)
+            loss, nll_value, smooth_value = nll_loss(predictions, confidences, targets, availabilities, lambda_smooth=0.5)
+
+            nll_total += nll_value.item()
+            smooth_total += smooth_value.item()
 
             loss.backward()
             optimizer.step()
@@ -82,6 +91,9 @@ def main():
             epoch_loss += loss.item()
 
         avg_loss = epoch_loss / len(dataloader)
+
+        log_file.write(f"Epoch {epoch+1}, avg_loss={avg_loss:.4f}, avg_nll={nll_total / len(dataloader):.4f}, avg_smooth={smooth_total / len(dataloader):.4f}\\n")
+        log_file.flush()
 
         os.makedirs("checkpoints", exist_ok=True)
         checkpoint_path = f"checkpoints/model_epoch_{epoch+1}.pt"
@@ -97,6 +109,8 @@ def main():
             torch.save(model.state_dict(), "checkpoints/model_best.pt")
 
         print(f"🧮 Epoch {epoch+1} — avg NLL loss: {avg_loss:.4f}")
+
+    log_file.close()
 
     # === Сохранение модели ===
     model_path = cfg["model_params"]["model_path"]

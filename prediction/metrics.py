@@ -63,4 +63,4 @@ def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambd
 
     smooth = compute_smoothness_loss(predictions, alpha=1.0, beta=1.0)
     # print(f"[DEBUG] NLL: {nll.item():.4f}, Smooth: {smooth.item():.4f}")
-    return nll + lambda_smooth * smooth
+    return nll + lambda_smooth * smooth, nll.detach(), smooth.detach()
