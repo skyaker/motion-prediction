@@ -62,6 +62,8 @@ def main():
     print(f"Start training for {num_epochs} epochs...")
 
     model.train()
+    best_loss = float('inf')
+
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
@@ -80,6 +82,20 @@ def main():
             epoch_loss += loss.item()
 
         avg_loss = epoch_loss / len(dataloader)
+
+        os.makedirs("checkpoints", exist_ok=True)
+        checkpoint_path = f"checkpoints/model_epoch_{epoch+1}.pt"
+        torch.save({
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': avg_loss
+        }, checkpoint_path)
+
+        if avg_loss < best_loss:
+            best_loss = avg_loss
+            torch.save(model.state_dict(), "checkpoints/model_best.pt")
+
         print(f"🧮 Epoch {epoch+1} — avg NLL loss: {avg_loss:.4f}")
 
     # === Сохранение модели ===

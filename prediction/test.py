@@ -66,6 +66,70 @@ def visualize_scene(image, history, target, predictions, confidences, output_pat
     plt.close()
 
 
+def visualize_scene_collage(image, history, target, predictions, confidences, output_path, raster_size, num_trajectories=3):
+    MAP_CHANNELS = [22, 23, 24]
+    img_rgb = image[MAP_CHANNELS, :, :].transpose(1, 2, 0)
+
+    def to_pixel_coords(points):
+        return points[:, 0] * 4 + raster_size[0] * 0.25, points[:, 1] * 4 + raster_size[1] * 0.5
+
+    fig, axs = plt.subplots(2, 3, figsize=(18, 10))
+    fig.suptitle("Trajectory Breakdown", fontsize=16)
+
+    colors = ['lightblue', 'orange', 'lightgreen']
+    markers = ['s-', 'P-', 'X-']
+    sorted_idx = np.argsort(-confidences)[:num_trajectories]
+
+    # Верхняя строка: 3 предсказания
+    for j, idx in enumerate(sorted_idx):
+        ax = axs[0, j]
+        ax.imshow(img_rgb, origin='upper')
+        x, y = to_pixel_coords(predictions[idx])
+        ax.plot(x, y, markers[j], color=colors[j], label=f'Pred #{j+1} ({confidences[idx]:.2f})')
+        ax.set_title(f"Prediction #{j+1}", fontsize=12)
+        ax.axis('off')
+
+    # Нижняя строка — история, цель, всё вместе
+    # История
+    ax = axs[1, 0]
+    ax.imshow(img_rgb, origin='upper')
+    if history is not None:
+        x, y = to_pixel_coords(history)
+        ax.plot(x, y, 'o-', color='blue', label='History')
+    ax.set_title("History", fontsize=12)
+    ax.axis('off')
+
+    # Цель
+    ax = axs[1, 1]
+    ax.imshow(img_rgb, origin='upper')
+    if target is not None:
+        x, y = to_pixel_coords(target)
+        ax.plot(x, y, 'o--', color='red', label='Real')
+    ax.set_title("Ground Truth", fontsize=12)
+    ax.axis('off')
+
+    # Объединённая сцена
+    ax = axs[1, 2]
+    ax.imshow(img_rgb, origin='upper')
+    for j, idx in enumerate(sorted_idx):
+        x, y = to_pixel_coords(predictions[idx])
+        ax.plot(x, y, markers[j], color=colors[j], label=f'Pred #{j+1} ({confidences[idx]:.2f})')
+    if history is not None:
+        x, y = to_pixel_coords(history)
+        ax.plot(x, y, 'o-', color='blue', label='History')
+    if target is not None:
+        x, y = to_pixel_coords(target)
+        ax.plot(x, y, 'o--', color='red', label='Real')
+    ax.set_title("Combined", fontsize=12)
+    ax.legend()
+    ax.axis('off')
+
+    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(output_path, bbox_inches='tight')
+    plt.close()
+
+
 def main():
     cfg = load_config()
     mode = cfg["hardware"]["mode"]
@@ -125,6 +189,17 @@ def main():
                     predictions=preds,
                     confidences=confs,
                     output_path=save_path,
+                    raster_size=raster_size
+                )
+
+                collage_path = f"output_images/collage_scene_{global_index}.png"
+                visualize_scene_collage(
+                    image=img,
+                    history=history,
+                    target=target,
+                    predictions=preds,
+                    confidences=confs,
+                    output_path=collage_path,
                     raster_size=raster_size
                 )
 
