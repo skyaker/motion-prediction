@@ -133,7 +133,7 @@ def visualize_scene_collage(image, history, target, predictions, confidences, ou
 def main():
     cfg = load_config()
     mode = cfg["hardware"]["mode"]
-    zarr_path = cfg["test_data_loader"]["key"]
+    zarr_path = cfg["test_data_loader"]["key"][mode]
 
     dm = LocalDataManager(cfg["data_path"])
     
@@ -146,7 +146,7 @@ def main():
 
     raster_size = tuple(cfg["raster_params"]["raster_size"])
     pixel_size = tuple(cfg["raster_params"]["pixel_size"])
-    zarr_path = cfg["test_data_loader"]["key"]
+    zarr_path = cfg["test_data_loader"]["key"][mode]
     batch_size = cfg["test_data_loader"]["batch_size"][mode]
     model_path = cfg["model_params"]["model_path"]
 

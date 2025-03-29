@@ -24,17 +24,19 @@ def unwrap_mode_config(cfg, mode):
     cfg["raster_params"] = unwrap_block(cfg["raster_params"])
     cfg["model_params"] = unwrap_block(cfg["model_params"])
     cfg["train_data_loader"] = unwrap_block(cfg["train_data_loader"])
-    cfg["test_data_loader"] = unwrap_block(cfg["test_data_loader"])
+    cfg["test_data_loader"] = unwrap_block(cfg["test_data_loader"]["key"])
     return cfg
 
 
 def main():
     # === Подготовка ===
     cfg = load_config_data("../config/lyft-config.yaml")
-    mode = cfg.get("hardware", {}).get("mode", "weak")
+    mode = cfg["hardware"]["mode"]
     cfg = unwrap_mode_config(cfg, mode)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # device = torch.device("cuda")
+    print("Device:", device)
 
     # === L5Kit ===
     dm = LocalDataManager("../lyft-motion-prediction-autonomous-vehicles")
@@ -80,7 +82,7 @@ def main():
 
             optimizer.zero_grad()
             predictions, confidences = model(image, is_stationary)  # [B, 3, T, 2], [B, 3]
-            loss, nll_value, smooth_value = nll_loss(predictions, confidences, targets, availabilities, lambda_smooth=0.5)
+            loss, nll_value, smooth_value = nll_loss(predictions, confidences, targets, availabilities, lambda_smooth=0.4)
 
             nll_total += nll_value.item()
             smooth_total += smooth_value.item()
@@ -89,6 +91,8 @@ def main():
             optimizer.step()
 
             epoch_loss += loss.item()
+            
+            # log_file.write(f"Epoch {epoch+1}, avg_loss={epoch_loss / len(dataloader):.4f}, avg_nll={nll_total / len(dataloader):.4f}, avg_smooth={smooth_total / len(dataloader):.4f}\\n")
 
         avg_loss = epoch_loss / len(dataloader)
 
