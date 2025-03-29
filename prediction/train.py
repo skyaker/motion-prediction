@@ -50,7 +50,8 @@ def main():
         dataset,
         batch_size=cfg["train_data_loader"]["batch_size"],
         shuffle=cfg["train_data_loader"]["shuffle"],
-        num_workers=cfg["train_data_loader"]["num_workers"]
+        num_workers=cfg["train_data_loader"]["num_workers"],
+        pin_memory=True
     )
 
     # === Модель ===
@@ -75,7 +76,7 @@ def main():
         smooth_total = 0.0
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
-            image = batch["image"].to(device)  # [B, 25, 224, 224]
+            image = batch["image"].to(device, non_blocking=True)  # [B, 25, 224, 224]
             is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)  # [B, 1]
             targets = batch["target_positions"].to(device)  # [B, T, 2]
             availabilities = batch["target_availabilities"].to(device)  # [B, T]
