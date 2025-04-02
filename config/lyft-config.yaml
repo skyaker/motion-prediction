@@ -57,8 +57,10 @@ raster_params:
 model_params:
   history_num_frames: 10
   future_num_frames: 50
+  # future_num_frames: 150
+  num_modes: 3
   train_epochs:
-    weak: 1
+    weak: 2
     strong: 10
   model_architecture: "resnet18"
   load_model: False
@@ -75,6 +77,11 @@ training_params:
   num_workers: 4  # Количество потоков загрузки данных
   optimizer: "adam"  # Оптимизатор (Adam)
   scheduler: "step"  # Планировщик скорости обучения
+
+loss_params:
+  lambda_smooth: 0.5
+  lambda_entropy: 0.01
+  lambda_coverage: 0.05
 
 paths:
   output_data: "output_data/"

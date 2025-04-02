@@ -8,18 +8,31 @@ class TrajectoryPredictor(nn.Module):
         self.num_modes = num_modes
         self.future_len = future_len
 
+        # Фича-экстрактор
         self.backbone = timm.create_model(
             'efficientnet_b0', features_only=True, pretrained=False
         )
-
         backbone_out_channels = self.backbone.feature_info[-1]['num_chs']
-        self.input_adapter = nn.Conv2d(input_channels, 3, kernel_size=1)
 
+        # Подгонка под RGB вход
+        self.input_adapter = nn.Conv2d(input_channels, 3, kernel_size=1)
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.head = nn.Sequential(
-            nn.Linear(backbone_out_channels + 1, 512),
+
+        # Модальные head'ы
+        self.traj_heads = nn.ModuleList([
+            nn.Sequential(
+                nn.Linear(backbone_out_channels + 1, 256),
+                nn.ReLU(),
+                nn.Linear(256, future_len * 2)
+            )
+            for _ in range(num_modes)
+        ])
+
+        # Head для вероятностей
+        self.confidence_head = nn.Sequential(
+            nn.Linear(backbone_out_channels + 1, 128),
             nn.ReLU(),
-            nn.Linear(512, num_modes * future_len * 2 + num_modes)
+            nn.Linear(128, num_modes)
         )
 
     def forward(self, x, is_stationary):
@@ -27,16 +40,19 @@ class TrajectoryPredictor(nn.Module):
         feats = self.backbone(x)[-1]
         pooled = self.pool(feats).flatten(1)  # [B, C]
 
-        # Добавим is_stationary как дополнительную фичу
-        is_stationary = is_stationary.float().view(-1, 1)  # [B, 1]
-        combined = torch.cat([pooled, is_stationary], dim=1)  # [B, C+1]
+        is_stationary = is_stationary.float().view(-1, 1)
+        context = torch.cat([pooled, is_stationary], dim=1)  # [B, C+1]
 
-        out = self.head(combined)
-        bs = x.shape[0]
-        traj = out[:, :self.num_modes * self.future_len * 2]
-        traj = traj.view(bs, self.num_modes, self.future_len, 2)
+        # Предсказания от каждой головы
+        trajectories = []
+        for head in self.traj_heads:
+            out = head(context).view(-1, self.future_len, 2)  # [B, T, 2]
+            trajectories.append(out)
 
-        confidences = out[:, -self.num_modes:]
-        confidences = torch.softmax(confidences, dim=1)
+        traj_tensor = torch.stack(trajectories, dim=1)  # [B, K, T, 2]
 
-        return traj, confidences
+        # Предсказания вероятностей
+        confidences = self.confidence_head(context)
+        confidences = torch.softmax(confidences, dim=1)  # [B, K]
+
+        return traj_tensor, confidences
