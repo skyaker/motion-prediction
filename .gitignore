@@ -6,8 +6,6 @@ archive-logs
 data_analyze/lyft-config.yaml
 data_analyze/images/*
 visualization/images
-prediction/output_data/
-prediction/output_images/
 __pycache__
 *.pth
 dataprocessing/
@@ -15,3 +13,11 @@ prediction/test_archive.py
 prediction/debug_infer.py
 prediction/raster_channels_images
 prediction/server_output
+prediction/dif.txt
+prediction/res_dif.py
+prediction/result.txt
+prediction/checkpoints
+prediciton/checkpoint_analyze.py
+prediction/data_analyze.py
+prediction/output_data/
+prediction/output_images/

@@ -1,9 +1,11 @@
 import os
+import matplotlib
 import yaml
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.lines import Line2D
 from torch.utils.data import DataLoader
 from dataset import TrajectoryDataset
 from model import TrajectoryPredictor
@@ -25,7 +27,7 @@ def world_to_image_coords(points, centroid, yaw, pixel_size, raster_size):
     image_center = np.array(raster_size) / 2
     return pixels + image_center
 
-def visualize_scene_collage(image, history, target, predictions, confidences, output_path, raster_size, num_trajectories=3):
+def visualize_scene_collage(image, history, target, predictions, confidences, traffic_light_status, output_path, raster_size, num_trajectories=3):
     MAP_CHANNELS = [22, 23, 24]
     img_rgb = image[MAP_CHANNELS, :, :].transpose(1, 2, 0)
 
@@ -80,6 +82,29 @@ def visualize_scene_collage(image, history, target, predictions, confidences, ou
         x, y = to_pixel_coords(target)
         ax.plot(x, y, 'o--', color='red', label='Real')
     ax.set_title("Combined", fontsize=12)
+
+    status = traffic_light_status
+    light = np.argmax(status)
+
+    if light == 0:
+        light_label = "🔴 RED"
+    elif light == 1:
+        light_label = "🟡 YELLOW"
+    else:
+        light_label = "🟢 GREEN"
+
+    # print(traffic_light_status)
+
+    # Добавим в легенду через искусственную линию
+    handles, labels = ax.get_legend_handles_labels()
+    extra = Line2D([0], [0], color='black', label=f"Traffic light: {light_label}")
+    ax.legend(handles + [extra], labels + [f"Traffic light: {light_label}"])
+
+    COLOR_MAP = {0: "unknown", 1: "green", 2: "yellow", 3: "red", 4: "none"}
+    status_str = f"Traffic Light: {COLOR_MAP.get(int(traffic_light_status), 'N/A')}"
+
+    fig.text(0.5, 0.02, status_str, ha='center', fontsize=12, bbox=dict(facecolor='lightgrey', alpha=0.5))
+
     ax.legend()
     ax.axis('off')
 
@@ -124,8 +149,9 @@ def main():
         for batch_idx, batch in enumerate(tqdm(loader)):
             image = batch["image"].to(device)
             is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
+            traffic_light_status = batch["traffic_light_status"].unsqueeze(1).float().to(device)
 
-            trajectories, confidences = model(image, is_stationary)
+            trajectories, confidences = model(image, is_stationary, traffic_light_status)
             confidences = confidences.cpu().numpy()
             predictions = trajectories.cpu().numpy()
 
@@ -133,6 +159,7 @@ def main():
                 img = image[i].cpu().numpy()
                 history = batch["history_positions"][i].cpu().numpy()
                 target = batch["target_positions"][i].cpu().numpy()
+                tl_status = traffic_light_status[i].cpu().numpy()
 
                 preds = predictions[i]  # [K, T, 2]
                 confs = confidences[i]  # [K]
@@ -145,6 +172,7 @@ def main():
                     target=target,
                     predictions=preds,
                     confidences=confs,
+                    traffic_light_status = tl_status,
                     output_path=collage_path,
                     raster_size=raster_size
                 )
