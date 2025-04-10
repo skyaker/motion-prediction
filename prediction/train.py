@@ -1,8 +1,8 @@
 import torch
 import os
 import time
-# torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
-# torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
+torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
+torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from tqdm import tqdm
@@ -75,12 +75,10 @@ def main():
             is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)
             targets = batch["target_positions"].to(device)
             availabilities = batch["target_availabilities"].to(device)
-            # traffic_light_status = batch["traffic_light_status"].to(device)
-            traffic_light_status = batch["traffic_light_status"].unsqueeze(1).float().to(device)
 
 
             optimizer.zero_grad()
-            predictions, confidences = model(image, is_stationary, traffic_light_status)
+            predictions, confidences = model(image, is_stationary)
 
             loss, nll_val, smooth_val, entropy_val = nll_loss(
                 predictions, confidences, targets, availabilities,
