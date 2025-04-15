@@ -141,8 +141,9 @@ def main():
             images = [image[i].cpu().numpy() for i in range(image.shape[0])]
 
             is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
+            curvature = batch["curvature"].to(device)
 
-            trajectories, confidences = model(image, is_stationary)
+            trajectories, confidences = model(image, is_stationary, curvature)
             confidences = confidences.cpu().numpy()
             predictions = trajectories.cpu().numpy()
 

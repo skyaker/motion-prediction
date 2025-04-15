@@ -75,10 +75,10 @@ def main():
             is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)
             targets = batch["target_positions"].to(device)
             availabilities = batch["target_availabilities"].to(device)
-
+            curvature = batch["curvature"].to(device)
 
             optimizer.zero_grad()
-            predictions, confidences = model(image, is_stationary)
+            predictions, confidences = model(image, is_stationary, curvature)
 
             loss, nll_val, smooth_val, entropy_val = nll_loss(
                 predictions, confidences, targets, availabilities,

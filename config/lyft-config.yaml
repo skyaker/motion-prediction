@@ -53,7 +53,7 @@ raster_params:
   set_origin_to_bottom: False
   filter_agents_threshold: 0.5
   disable_traffic_light_faces: False
-  use_traffic_lights: True
+  # use_traffic_lights: True
 
 model_params:
   history_num_frames: 10
