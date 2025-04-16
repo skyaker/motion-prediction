@@ -50,7 +50,28 @@ class TrajectoryDataset(Dataset):
             curvature = np.mean(np.abs(heading_change))
         else:
             curvature = 0.0
+
+        curvature = np.clip(curvature * 2.0, 0.0, 1.0)
         data["curvature"] = np.array([curvature], dtype=np.float32)
+
+        # vector change speed
+        step_time = 0.1  # кадр = 10 Гц
+
+        if history.shape[0] >= 3:
+            dx = history[1:, 0] - history[:-1, 0]
+            dy = history[1:, 1] - history[:-1, 1]
+            headings = np.arctan2(dy, dx)
+
+            heading_diff = headings[1:] - headings[:-1]
+            heading_diff = (heading_diff + np.pi) % (2 * np.pi) - np.pi
+
+            heading_change_rate = heading_diff[-1] / step_time if len(heading_diff) > 0 else 0.0
+        else:
+            heading_change_rate = 0.0
+
+        heading_change_rate = np.clip(heading_change_rate, -2.0, 2.0)
+        data["heading_change_rate"] = np.array([heading_change_rate], dtype=np.float32)
+
 
         # 6 additional channels: [vx, vy, sin(yaw), cos(yaw), ax, ay]
         _, H, W = data["image"].shape
@@ -72,5 +93,6 @@ class TrajectoryDataset(Dataset):
             "target_positions": data["target_positions"],
             "target_availabilities": data["target_availabilities"],
             "is_stationary": is_stationary,
-            "curvature": data["curvature"]
+            "curvature": data["curvature"],
+            "heading_change_rate": data["heading_change_rate"]
         }

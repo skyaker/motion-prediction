@@ -142,8 +142,9 @@ def main():
 
             is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
             curvature = batch["curvature"].to(device)
+            heading_change_rate = batch["heading_change_rate"].to(device)
 
-            trajectories, confidences = model(image, is_stationary, curvature)
+            trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate)
             confidences = confidences.cpu().numpy()
             predictions = trajectories.cpu().numpy()
 

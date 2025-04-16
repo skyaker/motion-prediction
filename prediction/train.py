@@ -76,9 +76,10 @@ def main():
             targets = batch["target_positions"].to(device)
             availabilities = batch["target_availabilities"].to(device)
             curvature = batch["curvature"].to(device)
+            heading_change_rate = batch["heading_change_rate"].to(device)
 
             optimizer.zero_grad()
-            predictions, confidences = model(image, is_stationary, curvature)
+            predictions, confidences = model(image, is_stationary, curvature, heading_change_rate)
 
             loss, nll_val, smooth_val, entropy_val = nll_loss(
                 predictions, confidences, targets, availabilities,
