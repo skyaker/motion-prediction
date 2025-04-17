@@ -64,11 +64,29 @@ def main():
     os.makedirs("server_output", exist_ok=True)
     log_file = open("server_output/train_log.txt", "a")
 
-    for epoch in range(num_epochs):
+    resume_training = True  # переключатель
+    checkpoint_path = "./checkpoints/model_best.pt"
+    start_epoch = 0
+
+    if resume_training and os.path.exists(checkpoint_path):
+        print("Train from checkpoint")
+        checkpoint = torch.load(checkpoint_path, map_location=device)
+        model.load_state_dict(checkpoint["model_state_dict"])
+        optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+        start_epoch = checkpoint.get("epoch", 0) + 1
+    else:
+        print("Training from scratch")
+
+    for epoch in range(start_epoch, start_epoch + num_epochs):
         epoch_loss = 0.0
         nll_total = 0.0
         smooth_total = 0.0
         entropy_total = 0.0
+
+        epoch_targets = []
+        epoch_predictions = []
+
+        # TRAINING BY FRAMES ----------------------------------------------------------------
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             image = batch["image"].to(device, non_blocking=True)
@@ -97,10 +115,42 @@ def main():
 
             epoch_loss += loss.item()
 
+            epoch_targets.append(targets.detach().cpu())
+            epoch_predictions.append(predictions.detach().cpu())
+
+
+        # LOSS LOGGING ----------------------------------------------------------------------
+
         avg_loss = epoch_loss / len(dataloader)
 
-        log_file.write(f"Epoch {epoch+1}, avg_loss={avg_loss:.4f}, avg_nll={nll_total / len(dataloader):.4f}, avg_smooth={smooth_total / len(dataloader):.4f}, avg_entropy={entropy_total / len(dataloader):.4f}\n")
-        log_file.flush()
+        log_path = "./server_output/info_log.txt"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a") as log_file:
+            log_file.write(f"Epoch {epoch+1}, avg_loss={avg_loss:.4f}, avg_nll={nll_total / len(dataloader):.4f}, avg_smooth={smooth_total / len(dataloader):.4f}, avg_entropy={entropy_total / len(dataloader):.4f}\n")
+            log_file.flush()
+
+        # PREDICTION LENGTH LOGGING ---------------------------------------------------------
+
+        targets_all = torch.cat(epoch_targets, dim=0)
+        preds_all = torch.cat(epoch_predictions, dim=0)
+
+        gt_deltas = targets_all[:, 1:] - targets_all[:, :-1]
+        gt_lengths = torch.norm(gt_deltas, dim=-1).sum(dim=-1)
+
+        pred_deltas = preds_all[:, 0, 1:] - preds_all[:, 0, :-1]
+        pred_lengths = torch.norm(pred_deltas, dim=-1).sum(dim=-1)
+
+        avg_gt_len = gt_lengths.mean().item()
+        avg_pred_len = pred_lengths.mean().item()
+
+        log_path = "./server_output/info_log.txt"
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a") as log_file:
+            log_file.write(f"[Epoch {epoch}] ⛳ Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}\\n")
+        print(f"[Epoch {epoch}] ⛳ Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}")
+
+
+        # MODEL, CHECKPOINT SAVE ------------------------------------------------------------
 
         os.makedirs("checkpoints", exist_ok=True)
         checkpoint_path = f"checkpoints/model_epoch_{epoch+1}.pt"
@@ -111,9 +161,16 @@ def main():
             'loss': avg_loss
         }, checkpoint_path)
 
+        # BEST MODEL SAVE -------------------------------------------------------------------
+
         if avg_loss < best_loss:
             best_loss = avg_loss
-            torch.save(model.state_dict(), "checkpoints/model_best.pt")
+            torch.save({
+                'epoch': epoch + 1,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': avg_loss
+            }, "checkpoints/model_best.pt")
 
         print(f"\U0001f9ee Epoch {epoch+1} — avg NLL loss: {avg_loss:.4f}")
 

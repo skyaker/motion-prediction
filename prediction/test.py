@@ -152,7 +152,7 @@ def main():
             agents_data = []
             for i in range(image.shape[0]):
                 history = batch["history_positions"][i].cpu().numpy()
-                target = batch["target_positions"][i].cpu().numpy()
+                target = batch["target_positions"][i, :50].cpu().numpy()
                 preds = predictions[i]
                 confs = confidences[i]
                 agents_data.append({
