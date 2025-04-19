@@ -14,6 +14,10 @@ class TrajectoryDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.agent_dataset[idx]
+        # print(data.keys())
+        frame_index = data["frame_index"]
+        # temp = AgentDataset.get_frame_indices(self.agent_dataset, frame_idx=int(frame_index))
+        # print(frame_index)
 
         history = data["history_positions"]
         diffs = np.linalg.norm(history[1:] - history[:-1], axis=1)

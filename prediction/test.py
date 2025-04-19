@@ -1,11 +1,8 @@
 import os
-import matplotlib
 import yaml
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib.lines import Line2D
 from torch.utils.data import DataLoader
 from dataset import TrajectoryDataset
 from model import TrajectoryPredictor
@@ -17,7 +14,6 @@ from l5kit.rasterization import build_rasterizer
 def load_config(path="../config/lyft-config.yaml"):
     with open(path, "r") as f:
         return yaml.safe_load(f)
-
 
 cfg = load_config()
 
@@ -115,15 +111,10 @@ def main():
     zd = ChunkedDataset(dm.require(zarr_path))
     zd.open()
 
-    # l5kit parameters form requirement
     cfg["raster_params"]["raster_size"] = cfg["raster_params"]["raster_size"][MODE]
-
     rasterizer = build_rasterizer(cfg, dm)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-    dataset = TrajectoryDataset(cfg=cfg, zarr_dataset=zd, rasterizer=rasterizer)
-    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     model = TrajectoryPredictor(
         future_len=FUTURE_LEN,
@@ -136,37 +127,52 @@ def main():
     os.makedirs("server_output/output_images", exist_ok=True)
 
     with torch.no_grad():
-        for batch_idx, batch in enumerate(tqdm(loader)):
-            image = batch["image"].to(device)
-            images = [image[i].cpu().numpy() for i in range(image.shape[0])]
+        for scene_idx, scene in enumerate(zd.scenes):
+            print(scene_idx)
+            print(f"Processing scene {scene_idx}")
+            scene_dataset = zd.get_scene_dataset(scene_idx)
 
-            is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
-            curvature = batch["curvature"].to(device)
-            heading_change_rate = batch["heading_change_rate"].to(device)
+            if len(scene_dataset.frames) == 0 or len(scene_dataset.agents) == 0:
+                print(f"Skipping empty scene {scene_idx}")
+                continue
 
-            trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate)
-            confidences = confidences.cpu().numpy()
-            predictions = trajectories.cpu().numpy()
-
-            # Собираем мультиагентную сцену для визуализации
-            agents_data = []
-            for i in range(image.shape[0]):
-                history = batch["history_positions"][i].cpu().numpy()
-                target = batch["target_positions"][i, :50].cpu().numpy()
-                preds = predictions[i]
-                confs = confidences[i]
-                agents_data.append({
-                    "history": history,
-                    "target": target,
-                    "predictions": preds,
-                    "confidences": confs,
-                    "centroid": batch["centroid"][i].cpu().numpy(),
-                    "yaw": batch["yaw"][i].item()                
-                })
+            dataset = TrajectoryDataset(cfg=cfg, zarr_dataset=scene_dataset, rasterizer=rasterizer)
             
-            output_path = f"server_output/output_images"
+            try:
+                _ = dataset[0]
+            except IndexError as e:
+                print(f"Scene {scene_idx} has invalid agent sampling. Skipping.")
+                continue
 
-            visualize_multi_agent_collage(images, agents_data, output_path, batch_idx)
+            loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+            for batch_idx, batch in enumerate(tqdm(loader, desc=f"Scene {scene_idx}")):
+                image = batch["image"].to(device)
+                images = [image[i].cpu().numpy() for i in range(image.shape[0])]
+
+                is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
+                curvature = batch["curvature"].to(device)
+                heading_change_rate = batch["heading_change_rate"].to(device)
+
+                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate)
+                confidences = confidences.cpu().numpy()
+                predictions = trajectories.cpu().numpy()
+
+                agents_data = []
+                for i in range(image.shape[0]):
+                    agents_data.append({
+                        "history": batch["history_positions"][i].cpu().numpy(),
+                        "target": batch["target_positions"][i, :50].cpu().numpy(),
+                        "predictions": predictions[i],
+                        "confidences": confidences[i],
+                        "centroid": batch["centroid"][i].cpu().numpy(),
+                        "yaw": batch["yaw"][i].item()
+                    })
+
+                output_path = f"server_output/output_images"
+                frame_id = f"scene{scene_idx}_batch{batch_idx}"
+
+                visualize_multi_agent_collage(images, agents_data, output_path, frame_id)
 
 
 if __name__ == "__main__":

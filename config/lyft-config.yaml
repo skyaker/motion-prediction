@@ -61,7 +61,7 @@ model_params:
   # future_num_frames: 150
   num_modes: 3
   train_epochs:
-    weak: 2
+    weak: 1
     strong: 10
   model_architecture: "resnet18"
   load_model: False
