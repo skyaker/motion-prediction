@@ -21,7 +21,7 @@ class TrajectoryPredictor(nn.Module):
         # Модальные head'ы
         self.traj_heads = nn.ModuleList([
             nn.Sequential(
-                nn.Linear(backbone_out_channels + 1 + 1 + 1, 256),
+                nn.Linear(backbone_out_channels + 1 + 1 + 1 + 4, 256),
                 nn.ReLU(),
                 nn.Linear(256, future_len * 2)
             )
@@ -30,19 +30,23 @@ class TrajectoryPredictor(nn.Module):
 
         # Head для вероятностей
         self.confidence_head = nn.Sequential(
-            nn.Linear(backbone_out_channels + 1 + 1 + 1, 128),
+            nn.Linear(backbone_out_channels + 1 + 1 + 1 +4, 128),
             nn.ReLU(),
             nn.Linear(128, num_modes)
         )
 
-    def forward(self, x, is_stationary, curvature, heading_change_rate):
+    def forward(self, x, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors):
         x = self.input_adapter(x)
         feats = self.backbone(x)[-1]
         pooled = self.pool(feats).flatten(1)  # [B, C]
 
         is_stationary = is_stationary.float().view(-1, 1)
         curvature = curvature.view(-1, 1)  
-        context = torch.cat([pooled, is_stationary, curvature, heading_change_rate], dim=1)  # [B, C+1]
+        avg_neighbor_vx = avg_neighbor_vx.view(-1, 1)
+        avg_neighbor_vy = avg_neighbor_vy.view(-1, 1)
+        avg_neighbor_heading = avg_neighbor_heading.view(-1, 1)
+        n_neighbors = n_neighbors.view(-1, 1)
+        context = torch.cat([pooled, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors], dim=1)  # [B, C+1]
 
         # Предсказания от каждой головы
         trajectories = []

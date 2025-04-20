@@ -21,7 +21,7 @@ def compute_coverage_loss(predictions):
     return -avg_traj_len
 
 
-def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambda_smooth=0.5, lambda_entropy=0.01, lambda_coverage=0.05):
+def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambda_smooth=0.5, lambda_entropy=0.01, lambda_coverage=0.05, cluster_centers=None, cluster_weights=None):
     """
     predictions: [B, K, T, 2]
     confidences: [B, K] (after softmax)
@@ -50,8 +50,17 @@ def nll_loss(predictions, confidences, targets, availabilities, sigma=1.0, lambd
     # Trajectory length
     coverage = compute_coverage_loss(predictions)
 
+    # Clusters
+    if cluster_centers is not None and cluster_weights is not None:
+        delta_target = targets[:, -1] - targets[:, 0]  # [B, 2]
+        distances = torch.cdist(delta_target.unsqueeze(1), cluster_centers.unsqueeze(0))  # [B, 1, K]
+        nearest_cluster = distances.argmin(dim=-1).squeeze()  # [B]
+        weight = cluster_weights[nearest_cluster]  # [B]
+    else:
+        weight = torch.ones(predictions.shape[0], device=predictions.device)
+
     total_loss = (
-        nll + 
+        (weight * nll).mean() + 
         lambda_smooth * smooth + 
         lambda_entropy * entropy +
         lambda_coverage * coverage

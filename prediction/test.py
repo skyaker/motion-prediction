@@ -154,7 +154,12 @@ def main():
                 curvature = batch["curvature"].to(device)
                 heading_change_rate = batch["heading_change_rate"].to(device)
 
-                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate)
+                avg_neighbor_vx = batch["avg_neighbor_vx"].to(device).float()
+                avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
+                avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
+                n_neighbors = batch["n_neighbors"].to(device).float()
+
+                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors)
                 confidences = confidences.cpu().numpy()
                 predictions = trajectories.cpu().numpy()
 

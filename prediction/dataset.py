@@ -1,4 +1,5 @@
 from l5kit.dataset import AgentDataset
+from l5kit.data import filter_agents_by_distance
 from torch.utils.data import Dataset
 import numpy as np
 import yaml
@@ -14,10 +15,7 @@ class TrajectoryDataset(Dataset):
 
     def __getitem__(self, idx):
         data = self.agent_dataset[idx]
-        # print(data.keys())
         frame_index = data["frame_index"]
-        # temp = AgentDataset.get_frame_indices(self.agent_dataset, frame_idx=int(frame_index))
-        # print(frame_index)
 
         history = data["history_positions"]
         diffs = np.linalg.norm(history[1:] - history[:-1], axis=1)
@@ -76,6 +74,30 @@ class TrajectoryDataset(Dataset):
         heading_change_rate = np.clip(heading_change_rate, -2.0, 2.0)
         data["heading_change_rate"] = np.array([heading_change_rate], dtype=np.float32)
 
+        # neighbor feature
+        frame = self.agent_dataset.dataset.frames[frame_index]
+        start, end = frame["agent_index_interval"]
+        all_agents = self.agent_dataset.dataset.agents[start:end]
+
+        # исключаем самого себя по track_id
+        other_agents = all_agents[all_agents["track_id"] != data["track_id"]]
+
+        neighbors = filter_agents_by_distance(other_agents, data["centroid"], max_distance=15.0)
+        n_neighbors = len(neighbors)
+
+        if n_neighbors > 0:
+            avg_velocity = np.mean(neighbors["velocity"], axis=0)
+            headings = neighbors["yaw"]
+            avg_heading = np.arctan2(np.mean(np.sin(headings)), np.mean(np.cos(headings)))
+        else:
+            avg_velocity = np.zeros(2, dtype=np.float32)
+            avg_heading = 0.0
+
+        data["avg_neighbor_vx"] = np.array([avg_velocity[0]], dtype=np.float32)
+        data["avg_neighbor_vy"] = np.array([avg_velocity[1]], dtype=np.float32)
+        data["avg_neighbor_heading"] = np.array([avg_heading], dtype=np.float32)
+        data["n_neighbors"] = np.array([n_neighbors / 15.0], dtype=np.float32) 
+
 
         # 6 additional channels: [vx, vy, sin(yaw), cos(yaw), ax, ay]
         _, H, W = data["image"].shape
@@ -98,5 +120,9 @@ class TrajectoryDataset(Dataset):
             "target_availabilities": data["target_availabilities"],
             "is_stationary": is_stationary,
             "curvature": data["curvature"],
-            "heading_change_rate": data["heading_change_rate"]
+            "heading_change_rate": data["heading_change_rate"],
+            "avg_neighbor_vx": data["avg_neighbor_vx"],
+            "avg_neighbor_vy": data["avg_neighbor_vy"],
+            "avg_neighbor_heading": data["avg_neighbor_heading"],
+            "n_neighbors": data["n_neighbors"]
         }

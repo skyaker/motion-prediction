@@ -1,8 +1,9 @@
 import torch
 import os
 import time
-torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
-torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
+import numpy as np
+# torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
+# torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from tqdm import tqdm
@@ -15,6 +16,16 @@ from dataset import TrajectoryDataset
 from model import TrajectoryPredictor
 from metrics import nll_loss
 
+from sklearn.cluster import KMeans
+from collections import Counter
+
+
+def print_gpu_utilization():
+    print(f"GPU memory allocated: {torch.cuda.memory_allocated() / 1024**2:.2f} MB")
+    print(f"GPU memory reserved: {torch.cuda.memory_reserved() / 1024**2:.2f} MB")
+    print(f"GPU utilization: {torch.cuda.utilization()} %")
+
+
 def unwrap_mode_config(cfg, mode):
     def unwrap_block(d):
         return {k: v[mode] if isinstance(v, dict) and mode in v else v for k, v in d.items()}
@@ -23,7 +34,7 @@ def unwrap_mode_config(cfg, mode):
     cfg["train_data_loader"] = unwrap_block(cfg["train_data_loader"])
     cfg["test_data_loader"] = unwrap_block(cfg["test_data_loader"]["key"])
     return cfg
-
+ 
 def main():
     cfg = load_config_data("../config/lyft-config.yaml")
     mode = cfg["hardware"]["mode"]
@@ -47,6 +58,32 @@ def main():
         pin_memory=True
     )
 
+    # === CLUSTER TRAJECTORIES ===
+    print("Fitting KMeans on target trajectories...")
+    all_targets = []
+
+    for i in range(min(len(dataset), 5000)):  # ограничим для скорости
+        try:
+            ex = dataset[i]
+            delta = ex["target_positions"][-1] - ex["history_positions"][-1]
+            all_targets.append(delta)
+        except:
+            continue
+
+    all_targets = np.stack(all_targets, axis=0)
+    kmeans = KMeans(n_clusters=10, random_state=0).fit(all_targets)
+    cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(device)
+
+    # Считаем веса
+    labels = kmeans.labels_
+    freqs = Counter(labels)
+    total = sum(freqs.values())
+    cluster_weights = torch.tensor([
+        total / freqs[i] for i in range(10)
+    ], dtype=torch.float32).to(device)
+
+    # ============================
+
     model = TrajectoryPredictor(
         future_len=cfg["model_params"]["future_num_frames"],
         num_modes=cfg["model_params"]["num_modes"]
@@ -64,7 +101,7 @@ def main():
     os.makedirs("server_output", exist_ok=True)
     log_file = open("server_output/train_log.txt", "a")
 
-    resume_training = True  # переключатель
+    resume_training = True # переключатель
     checkpoint_path = "./checkpoints/model_best.pt"
     start_epoch = 0
 
@@ -89,21 +126,30 @@ def main():
         # TRAINING BY FRAMES ----------------------------------------------------------------
 
         for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+            if torch.cuda.is_available():
+                print_gpu_utilization()
+
             image = batch["image"].to(device, non_blocking=True)
             is_stationary = batch["is_stationary"].unsqueeze(1).float().to(device)
             targets = batch["target_positions"].to(device)
             availabilities = batch["target_availabilities"].to(device)
             curvature = batch["curvature"].to(device)
             heading_change_rate = batch["heading_change_rate"].to(device)
+            avg_neighbor_vx = batch["avg_neighbor_vx"].to(device).float()
+            avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
+            avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
+            n_neighbors = batch["n_neighbors"].to(device).float()
 
             optimizer.zero_grad()
-            predictions, confidences = model(image, is_stationary, curvature, heading_change_rate)
+            predictions, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors)
 
             loss, nll_val, smooth_val, entropy_val = nll_loss(
                 predictions, confidences, targets, availabilities,
                 lambda_smooth=cfg["loss_params"]["lambda_smooth"],
                 lambda_entropy=cfg["loss_params"]["lambda_entropy"],
-                lambda_coverage=cfg["loss_params"]["lambda_coverage"]
+                lambda_coverage=cfg["loss_params"]["lambda_coverage"],
+                cluster_centers=cluster_centers,
+                cluster_weights=cluster_weights
             )
 
             nll_total += nll_val.item()
