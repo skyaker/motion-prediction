@@ -10,7 +10,7 @@ class TrajectoryPredictor(nn.Module):
 
         # Фича-экстрактор
         self.backbone = timm.create_model(
-            'efficientnet_b0', features_only=True, pretrained=False
+            'efficientnet_b2', features_only=True, pretrained=True
         )
         backbone_out_channels = self.backbone.feature_info[-1]['num_chs']
 

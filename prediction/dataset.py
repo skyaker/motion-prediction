@@ -71,7 +71,7 @@ class TrajectoryDataset(Dataset):
         else:
             heading_change_rate = 0.0
 
-        heading_change_rate = np.clip(heading_change_rate, -2.0, 2.0)
+        heading_change_rate = np.clip(heading_change_rate / 3.14, -1.0, 1.0)
         data["heading_change_rate"] = np.array([heading_change_rate], dtype=np.float32)
 
         # neighbor feature

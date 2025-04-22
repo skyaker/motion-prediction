@@ -2,8 +2,8 @@ import torch
 import os
 import time
 import numpy as np
-# torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
-# torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
+torch.set_num_threads(1) # FOR LOCAL TRAIN ONLY
+torch.set_num_interop_threads(1) # FOR LOCAL TRAIN ONLY
 from torch.utils.data import DataLoader
 from torch import nn, optim
 from tqdm import tqdm
@@ -59,29 +59,29 @@ def main():
     )
 
     # === CLUSTER TRAJECTORIES ===
-    print("Fitting KMeans on target trajectories...")
-    all_targets = []
-
-    for i in range(min(len(dataset), 5000)):  # ограничим для скорости
-        try:
-            ex = dataset[i]
-            delta = ex["target_positions"][-1] - ex["history_positions"][-1]
-            all_targets.append(delta)
-        except:
-            continue
-
-    all_targets = np.stack(all_targets, axis=0)
-    kmeans = KMeans(n_clusters=10, random_state=0).fit(all_targets)
-    cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(device)
-
-    # Считаем веса
-    labels = kmeans.labels_
-    freqs = Counter(labels)
-    total = sum(freqs.values())
-    cluster_weights = torch.tensor([
-        total / freqs[i] for i in range(10)
-    ], dtype=torch.float32).to(device)
-
+    # print("Fitting KMeans on target trajectories...")
+    # all_targets = []
+    #
+    # for i in range(min(len(dataset), 5000)):  # ограничим для скорости
+    #     try:
+    #         ex = dataset[i]
+    #         delta = ex["target_positions"][-1] - ex["history_positions"][-1]
+    #         all_targets.append(delta)
+    #     except:
+    #         continue
+    #
+    # all_targets = np.stack(all_targets, axis=0)
+    # kmeans = KMeans(n_clusters=10, random_state=0).fit(all_targets)
+    # cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(device)
+    #
+    # # Считаем веса
+    # labels = kmeans.labels_
+    # freqs = Counter(labels)
+    # total = sum(freqs.values())
+    # cluster_weights = torch.tensor([
+    #     total / freqs[i] for i in range(10)
+    # ], dtype=torch.float32).to(device)
+    #
     # ============================
 
     model = TrajectoryPredictor(
@@ -148,8 +148,8 @@ def main():
                 lambda_smooth=cfg["loss_params"]["lambda_smooth"],
                 lambda_entropy=cfg["loss_params"]["lambda_entropy"],
                 lambda_coverage=cfg["loss_params"]["lambda_coverage"],
-                cluster_centers=cluster_centers,
-                cluster_weights=cluster_weights
+                # cluster_centers=cluster_centers,
+                # cluster_weights=cluster_weights
             )
 
             nll_total += nll_val.item()
