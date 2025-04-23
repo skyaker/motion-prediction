@@ -5,8 +5,9 @@ hardware:
 data_path: "../lyft-motion-prediction-autonomous-vehicles"
 
 train_data_loader:
+  # filter_agents_threshold: 0.5
   key:
-    weak: "../lyft-motion-prediction-autonomous-vehicles/scenes/sample.zarr"
+    weak: "scenes/train_subset_5k.zarr"
     strong: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
   batch_size:
     weak: 4
