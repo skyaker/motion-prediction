@@ -1,16 +1,33 @@
+from l5kit.configs import load_config_data
+
 import torch
 import torch.nn as nn
 import timm
 
+
+def unwrap_mode_config(cfg, mode):
+    def unwrap_block(d):
+        return {k: v[mode] if isinstance(v, dict) and mode in v else v for k, v in d.items()}
+    cfg["raster_params"] = unwrap_block(cfg["raster_params"])
+    cfg["model_params"] = unwrap_block(cfg["model_params"])
+    cfg["train_data_loader"] = unwrap_block(cfg["train_data_loader"])
+    cfg["test_data_loader"] = unwrap_block(cfg["test_data_loader"]["key"])
+    return cfg
+
+
 class TrajectoryPredictor(nn.Module):
     def __init__(self, input_channels=31, num_modes=3, future_len=50):
+        cfg = load_config_data("../config/lyft-config.yaml")
+        mode = cfg["hardware"]["mode"]
+        cfg = unwrap_mode_config(cfg, mode)
+        
         super().__init__()
         self.num_modes = num_modes
         self.future_len = future_len
 
         # Фича-экстрактор
         self.backbone = timm.create_model(
-            'efficientnet_b2', features_only=True, pretrained=True
+            cfg["model_params"]["model_architecture"], features_only=True, pretrained=True
         )
         backbone_out_channels = self.backbone.feature_info[-1]['num_chs']
 

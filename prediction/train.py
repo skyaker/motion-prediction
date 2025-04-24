@@ -47,6 +47,8 @@ def main():
     dm = LocalDataManager("../lyft-motion-prediction-autonomous-vehicles")
     zarr_dataset = ChunkedDataset(dm.require(cfg["train_data_loader"]["key"]))
     zarr_dataset.open()
+    print(str(zarr_dataset))
+
     rasterizer = build_rasterizer(cfg, dm)
 
     dataset = TrajectoryDataset(cfg, zarr_dataset, rasterizer)
@@ -89,6 +91,7 @@ def main():
         num_modes=cfg["model_params"]["num_modes"]
     )
     model.to(device)
+    model_architecture = cfg["model_params"]["model_architecture"]
 
     optimizer = optim.Adam(model.parameters(), lr=cfg["model_params"]["lr"], weight_decay=cfg["model_params"]["weight_decay"])
 
@@ -101,7 +104,7 @@ def main():
     os.makedirs("server_output", exist_ok=True)
     log_file = open("server_output/train_log.txt", "a")
 
-    resume_training = True # переключатель
+    resume_training = False # переключатель
     checkpoint_path = "./checkpoints/model_best.pt"
     start_epoch = 0
 
@@ -192,14 +195,14 @@ def main():
         log_path = "./server_output/info_log.txt"
         os.makedirs(os.path.dirname(log_path), exist_ok=True)
         with open(log_path, "a") as log_file:
-            log_file.write(f"[Epoch {epoch}] ⛳ Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}\\n")
-        print(f"[Epoch {epoch}] ⛳ Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}")
+            log_file.write(f"[Epoch {epoch}] Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}\\n")
+        print(f"[Epoch {epoch}] Avg GT Len: {avg_gt_len:.2f} | Pred Len: {avg_pred_len:.2f}")
 
 
         # MODEL, CHECKPOINT SAVE ------------------------------------------------------------
 
         os.makedirs("checkpoints", exist_ok=True)
-        checkpoint_path = f"checkpoints/model_epoch_{epoch+1}.pt"
+        checkpoint_path = f"checkpoints/model_{model_architecture}_epoch_{epoch+1}.pt"
         torch.save({
             'epoch': epoch + 1,
             'model_state_dict': model.state_dict(),
@@ -216,13 +219,13 @@ def main():
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': avg_loss
-            }, "checkpoints/model_best.pt")
+            }, f"checkpoints/model_best_{model_architecture}.pt")
 
         print(f"\U0001f9ee Epoch {epoch+1} — avg NLL loss: {avg_loss:.4f}")
 
     log_file.close()
 
-    model_path = cfg["model_params"]["model_path"]
+    model_path = f"{model_architecture}.pth"
     model_dir = os.path.dirname(model_path)
     if model_dir:
         os.makedirs(model_dir, exist_ok=True)

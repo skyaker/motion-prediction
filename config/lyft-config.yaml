@@ -5,9 +5,10 @@ hardware:
 data_path: "../lyft-motion-prediction-autonomous-vehicles"
 
 train_data_loader:
-  # filter_agents_threshold: 0.5
+  filter_agents_threshold: 0.5
   key:
     weak: "scenes/train_subset_5k.zarr"
+    # weak: "scenes/sample.zarr"
     strong: "../lyft-motion-prediction-autonomous-vehicles/scenes/train.zarr"
   batch_size:
     weak: 4
@@ -64,7 +65,7 @@ model_params:
   train_epochs:
     weak: 1
     strong: 10
-  model_architecture: "resnet18"
+  model_architecture: "efficientnet_b2"
   load_model: False
   model_path: "model.pth"
   lr: 0.001

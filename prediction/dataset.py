@@ -2,11 +2,17 @@ from l5kit.dataset import AgentDataset
 from l5kit.data import filter_agents_by_distance
 from torch.utils.data import Dataset
 import numpy as np
+import os
 import yaml
 
 class TrajectoryDataset(Dataset):
     def __init__(self, cfg, zarr_dataset, rasterizer):
+        # path = "../lyft-motion-prediction-autonomous-vehicles/"
+        # mask_path = os.path.join(path, cfg["train_data_loader"]["key"])
+        # agents_mask = np.load(os.path.join(mask_path, "agents_mask.npz"))["mask"]
+
         self.agent_dataset = AgentDataset(cfg, zarr_dataset, rasterizer)
+        # print(f"[DEBUG] agent_index (L5Kit): {self.agent_dataset.agent_index.shape}")
 
 
     def __len__(self):
