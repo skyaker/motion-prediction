@@ -104,8 +104,8 @@ def main():
     os.makedirs("server_output", exist_ok=True)
     log_file = open("server_output/train_log.txt", "a")
 
-    resume_training = False # переключатель
-    checkpoint_path = "./checkpoints/model_best.pt"
+    resume_training = True # переключатель
+    checkpoint_path = f"./checkpoints/model_best_{model_architecture}.pt"
     start_epoch = 0
 
     if resume_training and os.path.exists(checkpoint_path):
@@ -113,7 +113,7 @@ def main():
         checkpoint = torch.load(checkpoint_path, map_location=device)
         model.load_state_dict(checkpoint["model_state_dict"])
         optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
-        start_epoch = checkpoint.get("epoch", 0) + 1
+        start_epoch = checkpoint.get("epoch", 0)
     else:
         print("Training from scratch")
 
@@ -128,7 +128,7 @@ def main():
 
         # TRAINING BY FRAMES ----------------------------------------------------------------
 
-        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+        for batch in tqdm(dataloader, desc=f"Epoch {epoch+1}/{start_epoch + num_epochs}"):
             if torch.cuda.is_available():
                 print_gpu_utilization()
 
@@ -142,9 +142,11 @@ def main():
             avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
             avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
             n_neighbors = batch["n_neighbors"].to(device).float()
+            history_velocities = batch["history_velocities"].to(device).float()
+            trajectory_direction = batch["trajectory_direction"].to(device).float()
 
             optimizer.zero_grad()
-            predictions, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors)
+            predictions, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors, history_velocities, trajectory_direction)
 
             loss, nll_val, smooth_val, entropy_val = nll_loss(
                 predictions, confidences, targets, availabilities,

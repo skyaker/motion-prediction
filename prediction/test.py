@@ -158,8 +158,10 @@ def main():
                 avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
                 avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
                 n_neighbors = batch["n_neighbors"].to(device).float()
+                history_velocities = batch["history_velocities"].to(device).float()
+                trajectory_direction = batch["trajectory_direction"].to(device).float()
 
-                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors)
+                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors, history_velocities, trajectory_direction)
                 confidences = confidences.cpu().numpy()
                 predictions = trajectories.cpu().numpy()
 

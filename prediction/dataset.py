@@ -104,6 +104,17 @@ class TrajectoryDataset(Dataset):
         data["avg_neighbor_heading"] = np.array([avg_heading], dtype=np.float32)
         data["n_neighbors"] = np.array([n_neighbors / 15.0], dtype=np.float32) 
 
+        # history velocities
+        step_time = 0.1
+        positions = np.asarray(data["history_positions"], dtype=np.float32)
+        velocities = np.diff(positions, axis=0) / step_time
+        velocities = np.vstack([velocities, velocities[-1]])
+        data["history_velocities"] = velocities.astype(np.float32)
+
+        # trajectory direction
+        delta = data["target_positions"][-1] - data["history_positions"][-1]
+        trajectory_angle = np.arctan2(delta[1], delta[0]) / np.pi
+        data["trajectory_direction"] = np.array([trajectory_angle], dtype=np.float32)
 
         # 6 additional channels: [vx, vy, sin(yaw), cos(yaw), ax, ay]
         _, H, W = data["image"].shape
@@ -130,5 +141,7 @@ class TrajectoryDataset(Dataset):
             "avg_neighbor_vx": data["avg_neighbor_vx"],
             "avg_neighbor_vy": data["avg_neighbor_vy"],
             "avg_neighbor_heading": data["avg_neighbor_heading"],
-            "n_neighbors": data["n_neighbors"]
+            "n_neighbors": data["n_neighbors"],
+            "history_velocities": data["history_velocities"],
+            "trajectory_direction": data["trajectory_direction"]
         }
