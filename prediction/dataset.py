@@ -7,12 +7,7 @@ import yaml
 
 class TrajectoryDataset(Dataset):
     def __init__(self, cfg, zarr_dataset, rasterizer):
-        # path = "../lyft-motion-prediction-autonomous-vehicles/"
-        # mask_path = os.path.join(path, cfg["train_data_loader"]["key"])
-        # agents_mask = np.load(os.path.join(mask_path, "agents_mask.npz"))["mask"]
-
         self.agent_dataset = AgentDataset(cfg, zarr_dataset, rasterizer)
-        # print(f"[DEBUG] agent_index (L5Kit): {self.agent_dataset.agent_index.shape}")
 
 
     def __len__(self):
@@ -27,16 +22,19 @@ class TrajectoryDataset(Dataset):
         diffs = np.linalg.norm(history[1:] - history[:-1], axis=1)
         is_stationary = float(np.mean(diffs) < 0.1)
 
-        # velocity
+        # ==================================================== VELOCITY ====================================================
+
         velocity = data.get("current_velocity", np.zeros(2))  # fallback
         vx, vy = velocity[0], velocity[1]
 
-        # angle
+        # ==================================================== ANGLE ====================================================
+
         yaw = data["yaw"]
         sin_yaw = np.sin(yaw)
         cos_yaw = np.cos(yaw)
 
-        # acceleration
+        # ==================================================== ACCELERATION ====================================================
+
         step_time = 0.1
         velocities = (history[1:] - history[:-1]) / step_time
 
@@ -49,7 +47,8 @@ class TrajectoryDataset(Dataset):
             acc_mean = np.zeros(2)
             acc_magnitude = 0.0
 
-        # curvature
+        # ==================================================== CURVATURE ====================================================
+
         headings = np.arctan2(history[1:, 1] - history[:-1, 1],
                               history[1:, 0] - history[:-1, 0])
         heading_change = headings[1:] - headings[:-1]
@@ -62,7 +61,8 @@ class TrajectoryDataset(Dataset):
         curvature = np.clip(curvature * 2.0, 0.0, 1.0)
         data["curvature"] = np.array([curvature], dtype=np.float32)
 
-        # vector change speed
+        # ==================================================== VECTOR CHANGE SPEED ====================================================
+
         step_time = 0.1  # кадр = 10 Гц
 
         if history.shape[0] >= 3:
@@ -80,7 +80,8 @@ class TrajectoryDataset(Dataset):
         heading_change_rate = np.clip(heading_change_rate / 3.14, -1.0, 1.0)
         data["heading_change_rate"] = np.array([heading_change_rate], dtype=np.float32)
 
-        # neighbor feature
+        # ==================================================== NEIGHBORS AVG STATS ====================================================
+
         frame = self.agent_dataset.dataset.frames[frame_index]
         start, end = frame["agent_index_interval"]
         all_agents = self.agent_dataset.dataset.agents[start:end]
@@ -104,19 +105,38 @@ class TrajectoryDataset(Dataset):
         data["avg_neighbor_heading"] = np.array([avg_heading], dtype=np.float32)
         data["n_neighbors"] = np.array([n_neighbors / 15.0], dtype=np.float32) 
 
-        # history velocities
+        # ==================================================== NEIGHBORS POSITIONS ====================================================
+
+        max_neighbors = 10
+        rel_positions = []
+
+        for neighbor in neighbors:
+            rel_pos = neighbor["centroid"] - data["centroid"]
+            rel_positions.append(rel_pos)
+
+        while len(rel_positions) < max_neighbors:
+            rel_positions.append(np.array([0.0, 0.0], dtype=np.float32))
+
+        rel_positions = np.stack(rel_positions[:max_neighbors], axis=0)  # [N, 2]
+
+        data["rel_positions"] = rel_positions.astype(np.float32)
+
+        # ==================================================== HISTORY VELOCITIES ====================================================
+
         step_time = 0.1
         positions = np.asarray(data["history_positions"], dtype=np.float32)
         velocities = np.diff(positions, axis=0) / step_time
         velocities = np.vstack([velocities, velocities[-1]])
         data["history_velocities"] = velocities.astype(np.float32)
 
-        # trajectory direction
+        # ==================================================== TRAJECTORY DIRECTION ====================================================
+
         delta = data["target_positions"][-1] - data["history_positions"][-1]
         trajectory_angle = np.arctan2(delta[1], delta[0]) / np.pi
         data["trajectory_direction"] = np.array([trajectory_angle], dtype=np.float32)
 
-        # 6 additional channels: [vx, vy, sin(yaw), cos(yaw), ax, ay]
+        # ==================================================== SPEED, ANGLE, ACCELERATION ====================================================
+
         _, H, W = data["image"].shape
         extra_channels = np.ones((6, H, W), dtype=np.float32)
         extra_channels[0, :, :] *= vx
@@ -142,6 +162,7 @@ class TrajectoryDataset(Dataset):
             "avg_neighbor_vy": data["avg_neighbor_vy"],
             "avg_neighbor_heading": data["avg_neighbor_heading"],
             "n_neighbors": data["n_neighbors"],
+            # "rel_positions": data["rel_positions"],
             "history_velocities": data["history_velocities"],
             "trajectory_direction": data["trajectory_direction"]
         }

@@ -9,6 +9,7 @@ from model import TrajectoryPredictor
 from tqdm import tqdm
 from l5kit.data import LocalDataManager, ChunkedDataset
 from l5kit.rasterization import build_rasterizer
+from l5kit.evaluation.metrics import average_displacement_error_mean, final_displacement_error_mean
 
 
 def load_config(path="../config/lyft-config.yaml"):
@@ -106,13 +107,17 @@ def visualize_multi_agent_collage(images, agents_data, output_dir, frame_index, 
 
 def main():
     zarr_path = cfg["test_data_loader"]["key"][MODE]
-
     dm = LocalDataManager(cfg["data_path"])
     zd = ChunkedDataset(dm.require(zarr_path))
     zd.open()
 
     cfg["raster_params"]["raster_size"] = cfg["raster_params"]["raster_size"][MODE]
     rasterizer = build_rasterizer(cfg, dm)
+
+    model_name = cfg["model_params"]["model_architecture"]
+    output_dir = os.path.join("server_output", model_name, "images")
+
+    os.makedirs(output_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -124,62 +129,78 @@ def main():
     model.to(device)
     model.eval()
 
-    os.makedirs("server_output/output_images", exist_ok=True)
+    dataset = TrajectoryDataset(cfg=cfg, zarr_dataset=zd, rasterizer=rasterizer)
+    loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    os.makedirs(output_dir, exist_ok=True)
 
     with torch.no_grad():
-        for scene_idx, scene in enumerate(zd.scenes):
-            print(scene_idx)
-            print(f"Processing scene {scene_idx}")
-            scene_dataset = zd.get_scene_dataset(scene_idx)
+        ade_list = []
+        fde_list = []
 
-            if len(scene_dataset.frames) == 0 or len(scene_dataset.agents) == 0:
-                print(f"Skipping empty scene {scene_idx}")
-                continue
+        for batch_idx, batch in enumerate(tqdm(loader, desc="Testing full test.zarr")):
+            image = batch["image"].to(device)
+            images = [image[i].cpu().numpy() for i in range(image.shape[0])]
 
-            dataset = TrajectoryDataset(cfg=cfg, zarr_dataset=scene_dataset, rasterizer=rasterizer)
-            
-            try:
-                _ = dataset[0]
-            except IndexError as e:
-                print(f"Scene {scene_idx} has invalid agent sampling. Skipping.")
-                continue
+            is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
+            curvature = batch["curvature"].to(device)
+            heading_change_rate = batch["heading_change_rate"].to(device)
 
-            loader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=False)
+            avg_neighbor_vx = batch["avg_neighbor_vx"].to(device).float()
+            avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
+            avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
+            n_neighbors = batch["n_neighbors"].to(device).float()
+            history_velocities = batch["history_velocities"].to(device).float()
+            trajectory_direction = batch["trajectory_direction"].to(device).float()
 
-            for batch_idx, batch in enumerate(tqdm(loader, desc=f"Scene {scene_idx}")):
-                image = batch["image"].to(device)
-                images = [image[i].cpu().numpy() for i in range(image.shape[0])]
+            trajectories, confidences = model(
+                image, is_stationary, curvature, heading_change_rate,
+                avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading,
+                n_neighbors, history_velocities, trajectory_direction
+            )
 
-                is_stationary = batch["is_stationary"].to(device).float().unsqueeze(1)
-                curvature = batch["curvature"].to(device)
-                heading_change_rate = batch["heading_change_rate"].to(device)
+            confidences = confidences.cpu().numpy()
+            predictions = trajectories.cpu().numpy()
 
-                avg_neighbor_vx = batch["avg_neighbor_vx"].to(device).float()
-                avg_neighbor_vy = batch["avg_neighbor_vy"].to(device).float()
-                avg_neighbor_heading = batch["avg_neighbor_heading"].to(device).float()
-                n_neighbors = batch["n_neighbors"].to(device).float()
-                history_velocities = batch["history_velocities"].to(device).float()
-                trajectory_direction = batch["trajectory_direction"].to(device).float()
+            gt = batch["target_positions"].cpu().numpy()          # (B, T, 2)
+            avail = batch["target_availabilities"].cpu().numpy()   # (B, T)
 
-                trajectories, confidences = model(image, is_stationary, curvature, heading_change_rate, avg_neighbor_vx, avg_neighbor_vy, avg_neighbor_heading, n_neighbors, history_velocities, trajectory_direction)
-                confidences = confidences.cpu().numpy()
-                predictions = trajectories.cpu().numpy()
+            for i in range(gt.shape[0]):  # на каждого агента в батче
+                gt_agent = gt[i]  # (T, 2)
+                pred_agent = predictions[i]  # (num_modes, T, 2)
+                conf_agent = confidences[i]  # (num_modes,)
+                avail_agent = avail[i]  # (T,)
 
-                agents_data = []
-                for i in range(image.shape[0]):
-                    agents_data.append({
-                        "history": batch["history_positions"][i].cpu().numpy(),
-                        "target": batch["target_positions"][i, :50].cpu().numpy(),
-                        "predictions": predictions[i],
-                        "confidences": confidences[i],
-                        "centroid": batch["centroid"][i].cpu().numpy(),
-                        "yaw": batch["yaw"][i].item()
-                    })
+                ade = average_displacement_error_mean(gt_agent, pred_agent, conf_agent, avail_agent)
+                fde = final_displacement_error_mean(gt_agent, pred_agent, conf_agent, avail_agent)
 
-                output_path = f"server_output/output_images"
-                frame_id = f"scene{scene_idx}_batch{batch_idx}"
+                ade_list.append(ade)
+                fde_list.append(fde)
 
-                visualize_multi_agent_collage(images, agents_data, output_path, frame_id)
+            agents_data = []
+            for i in range(image.shape[0]):
+                agents_data.append({
+                    "history": batch["history_positions"][i].cpu().numpy(),
+                    "target": batch["target_positions"][i, :50].cpu().numpy(),
+                    "predictions": predictions[i],
+                    "confidences": confidences[i],
+                    "centroid": batch["centroid"][i].cpu().numpy(),
+                    "yaw": batch["yaw"][i].item()
+                })
+
+            frame_id = f"batch{batch_idx}"
+            visualize_multi_agent_collage(images, agents_data, output_dir, frame_id)
+
+        avg_ade = np.mean(ade_list)
+        avg_fde = np.mean(fde_list)
+
+        metrics_path = os.path.join("server_output", model_name, "metrics.txt")
+
+        with open(metrics_path, "w") as f:
+            f.write(f"ADE: {avg_ade:.6f}\n")
+            f.write(f"FDE: {avg_fde:.6f}\n")
+
+        print(f"Saved metrics to {metrics_path}")
 
 
 if __name__ == "__main__":
