@@ -60,32 +60,6 @@ def main():
         pin_memory=True
     )
 
-    # === CLUSTER TRAJECTORIES ===
-    # print("Fitting KMeans on target trajectories...")
-    # all_targets = []
-    #
-    # for i in range(min(len(dataset), 5000)):  # ограничим для скорости
-    #     try:
-    #         ex = dataset[i]
-    #         delta = ex["target_positions"][-1] - ex["history_positions"][-1]
-    #         all_targets.append(delta)
-    #     except:
-    #         continue
-    #
-    # all_targets = np.stack(all_targets, axis=0)
-    # kmeans = KMeans(n_clusters=10, random_state=0).fit(all_targets)
-    # cluster_centers = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32).to(device)
-    #
-    # # Считаем веса
-    # labels = kmeans.labels_
-    # freqs = Counter(labels)
-    # total = sum(freqs.values())
-    # cluster_weights = torch.tensor([
-    #     total / freqs[i] for i in range(10)
-    # ], dtype=torch.float32).to(device)
-    #
-    # ============================
-
     model = TrajectoryPredictor(
         future_len=cfg["model_params"]["future_num_frames"],
         num_modes=cfg["model_params"]["num_modes"]
@@ -153,8 +127,6 @@ def main():
                 lambda_smooth=cfg["loss_params"]["lambda_smooth"],
                 lambda_entropy=cfg["loss_params"]["lambda_entropy"],
                 lambda_coverage=cfg["loss_params"]["lambda_coverage"],
-                # cluster_centers=cluster_centers,
-                # cluster_weights=cluster_weights
             )
 
             nll_total += nll_val.item()
@@ -232,7 +204,7 @@ def main():
     if model_dir:
         os.makedirs(model_dir, exist_ok=True)
     torch.save(model.state_dict(), model_path)
-    print(f"✅ Модель сохранена: {model_path}")
+    print(f"Model saved: {model_path}")
 
 if __name__ == "__main__":
     main()

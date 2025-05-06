@@ -62,11 +62,14 @@ def visualize_multi_agent_collage(images, agents_data, output_dir, frame_index, 
 
     for i, agent in enumerate(agents_data):
         img_rgb = images[i][MAP_CHANNELS, :, :].transpose(1, 2, 0)
-
+        # if i == 1:
+        #     plt.imsave("semantic_map_rgb.png", img_rgb)
         sorted_idx = np.argsort(-agent["confidences"])[:num_trajectories]
 
+        img_gray = images[i].mean(axis=0)  # (H, W), усреднение по каналам
+
         # History & target
-        axs[i, 0].imshow(img_rgb, origin='upper')
+        axs[i, 0].imshow(img_gray, cmap="gray", origin="upper")
         axs[i, 0].plot(*to_pixel_coords(agent["target"], agent["centroid"], agent["yaw"]), 'o-', color='red', label='Target')
         axs[i, 0].plot(*to_pixel_coords(agent["history"], agent["centroid"], agent["yaw"]), 'o-', color='blue', label='History')
         axs[i, 0].set_title(f"Agent {i} - History & Target", fontsize=10)
@@ -74,7 +77,7 @@ def visualize_multi_agent_collage(images, agents_data, output_dir, frame_index, 
         axs[i, 0].axis('off')
 
         # Predictions
-        axs[i, 1].imshow(img_rgb, origin='upper')
+        axs[i, 1].imshow(img_gray, cmap="gray", origin="upper")
         for j, idx in reversed(list(enumerate(sorted_idx))):
             axs[i, 1].plot(*to_pixel_coords(agent["predictions"][idx], agent["centroid"], agent["yaw"]),
                         markers[j], color=pred_colors[j], label=f'Pred #{j+1} ({agent["confidences"][idx]:.2f})')
@@ -83,7 +86,8 @@ def visualize_multi_agent_collage(images, agents_data, output_dir, frame_index, 
         axs[i, 1].axis('off')
 
         # All
-        axs[i, 2].imshow(img_rgb, origin='upper')
+        axs[i, 2].imshow(img_gray, cmap="gray", origin="upper")
+
         if num_trajectories > 2:
             axs[i, 2].plot(*to_pixel_coords(agent["predictions"][sorted_idx[2]], agent["centroid"], agent["yaw"]), 'X-', color='lightgreen', label=f'Pred #3 ({agent["confidences"][sorted_idx[2]]:.2f})')
         if num_trajectories > 1:

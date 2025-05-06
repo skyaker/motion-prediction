@@ -26,7 +26,6 @@ class TrajectoryPredictor(nn.Module):
         self.num_modes = num_modes
         self.future_len = future_len
 
-        # Фича-экстрактор
         self.backbone = timm.create_model(
             cfg["model_params"]["model_architecture"], features_only=True, pretrained=True
         )
@@ -39,7 +38,6 @@ class TrajectoryPredictor(nn.Module):
         # LSTM
         self.history_lstm = nn.LSTM(input_size=2, hidden_size=32, batch_first=True)
 
-        # Модальные head'ы
         self.traj_heads = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(backbone_out_channels + 1 + 1 + 1 + 4 + 32 + 1, 256),
@@ -49,7 +47,6 @@ class TrajectoryPredictor(nn.Module):
             for _ in range(num_modes)
         ])
 
-        # Head для вероятностей
         self.confidence_head = nn.Sequential(
             nn.Linear(backbone_out_channels + 1 + 1 + 1 + 4 + 32 + 1, 128),
             nn.ReLU(),
@@ -81,7 +78,6 @@ class TrajectoryPredictor(nn.Module):
 
         traj_tensor = torch.stack(trajectories, dim=1)  # [B, K, T, 2]
 
-        # Предсказания вероятностей
         confidences = self.confidence_head(context)
         confidences = torch.softmax(confidences, dim=1)  # [B, K]
 

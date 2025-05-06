@@ -84,7 +84,7 @@ def main():
         print(f"Epoch {epoch+1}: avg_loss = {epoch_loss / len(dataloader):.4f}")
 
     torch.save(model.state_dict(), "baseline_model.pth")
-    print("✅ Baseline модель сохранена: baseline_model.pth")
+    print("Baseline saved")
 
 if __name__ == "__main__":
     main()

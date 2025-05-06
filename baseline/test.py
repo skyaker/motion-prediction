@@ -81,7 +81,7 @@ def main():
         f.write(f"ADE: {avg_ade:.6f}\n")
         f.write(f"FDE: {avg_fde:.6f}\n")
 
-    print(f"✅ Saved metrics to {metrics_path}")
+    print(f"Saved baseline metrics to {metrics_path}")
     print(f"ADE: {avg_ade:.4f} | FDE: {avg_fde:.4f}")
 
 if __name__ == "__main__":

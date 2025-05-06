@@ -6,7 +6,7 @@ def compute_smoothness_loss(predictions, alpha=1.0, beta=1.0):
     vel = predictions[:, :, 1:, :] - predictions[:, :, :-1, :]
     vel_loss = (vel ** 2).sum(-1).sum(-1).mean()
 
-    # acceleration (jerk)
+    # acceleration
     acc = predictions[:, :, 2:, :] - 2 * predictions[:, :, 1:-1, :] + predictions[:, :, :-2, :]
     jerk_loss = (acc ** 2).sum(-1).sum(-1).mean()
 
@@ -22,30 +22,18 @@ def compute_coverage_loss(predictions):
 
 
 def compute_length_loss(predictions, targets, availabilities):
-    """
-    MSE между длиной предсказанной траектории и длиной ground truth
-    predictions: [B, K, T, 2]
-    targets: [B, T, 2]
-    availabilities: [B, T]
-    """
-    pred_traj = predictions[:, 0]  # используем первую (наиболее вероятную) моду
-    pred_steps = pred_traj[:, 1:] - pred_traj[:, :-1]  # [B, T-1, 2]
-    pred_lengths = pred_steps.norm(dim=-1).sum(dim=-1)  # [B]
+    pred_traj = predictions[:, 0]
+    pred_steps = pred_traj[:, 1:] - pred_traj[:, :-1]
+    pred_lengths = pred_steps.norm(dim=-1).sum(dim=-1)
 
     target_steps = targets[:, 1:] - targets[:, :-1]
-    target_lengths = (target_steps.norm(dim=-1) * availabilities[:, 1:]).sum(dim=-1)  # [B]
+    target_lengths = (target_steps.norm(dim=-1) * availabilities[:, 1:]).sum(dim=-1)
 
     loss = F.mse_loss(pred_lengths, target_lengths)
     return loss
 
 
 def nll_loss(predictions, confidences, targets, availabilities, sigma=0.5, lambda_smooth=0.5, lambda_entropy=0.01, lambda_coverage=0.05, lambda_length=0.01, cluster_centers=None, cluster_weights=None):
-    """
-    predictions: [B, K, T, 2]
-    confidences: [B, K] (after softmax)
-    targets: [B, T, 2]
-    availabilities: [B, T]
-    """
     B, K, T, _ = predictions.shape
 
     # Ошибка
@@ -67,9 +55,6 @@ def nll_loss(predictions, confidences, targets, availabilities, sigma=0.5, lambd
 
     # Trajectory length
     coverage = compute_coverage_loss(predictions)
-
-    # Length loss
-    # length_loss = compute_length_loss(predictions, targets, availabilities)
 
     # Clusters
     if cluster_centers is not None and cluster_weights is not None:
