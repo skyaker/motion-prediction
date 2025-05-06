@@ -24,7 +24,7 @@ class TrajectoryDataset(Dataset):
 
         # ==================================================== VELOCITY ====================================================
 
-        velocity = data.get("current_velocity", np.zeros(2))  # fallback
+        velocity = data.get("current_velocity", np.zeros(2))
         vx, vy = velocity[0], velocity[1]
 
         # ==================================================== ANGLE ====================================================
@@ -63,7 +63,7 @@ class TrajectoryDataset(Dataset):
 
         # ==================================================== VECTOR CHANGE SPEED ====================================================
 
-        step_time = 0.1  # кадр = 10 Гц
+        step_time = 0.1
 
         if history.shape[0] >= 3:
             dx = history[1:, 0] - history[:-1, 0]
@@ -86,7 +86,6 @@ class TrajectoryDataset(Dataset):
         start, end = frame["agent_index_interval"]
         all_agents = self.agent_dataset.dataset.agents[start:end]
 
-        # исключаем самого себя по track_id
         other_agents = all_agents[all_agents["track_id"] != data["track_id"]]
 
         neighbors = filter_agents_by_distance(other_agents, data["centroid"], max_distance=15.0)
@@ -104,22 +103,6 @@ class TrajectoryDataset(Dataset):
         data["avg_neighbor_vy"] = np.array([avg_velocity[1]], dtype=np.float32)
         data["avg_neighbor_heading"] = np.array([avg_heading], dtype=np.float32)
         data["n_neighbors"] = np.array([n_neighbors / 15.0], dtype=np.float32) 
-
-        # ==================================================== NEIGHBORS POSITIONS ====================================================
-
-        max_neighbors = 10
-        rel_positions = []
-
-        for neighbor in neighbors:
-            rel_pos = neighbor["centroid"] - data["centroid"]
-            rel_positions.append(rel_pos)
-
-        while len(rel_positions) < max_neighbors:
-            rel_positions.append(np.array([0.0, 0.0], dtype=np.float32))
-
-        rel_positions = np.stack(rel_positions[:max_neighbors], axis=0)  # [N, 2]
-
-        data["rel_positions"] = rel_positions.astype(np.float32)
 
         # ==================================================== HISTORY VELOCITIES ====================================================
 
@@ -162,7 +145,7 @@ class TrajectoryDataset(Dataset):
             "avg_neighbor_vy": data["avg_neighbor_vy"],
             "avg_neighbor_heading": data["avg_neighbor_heading"],
             "n_neighbors": data["n_neighbors"],
-            # "rel_positions": data["rel_positions"],
             "history_velocities": data["history_velocities"],
-            "trajectory_direction": data["trajectory_direction"]
+            "trajectory_direction": data["trajectory_direction"],
+            "frame_index": frame_index
         }
